@@ -1,0 +1,39 @@
+---
+description: Firestore Security Rules requirements (roles, ownership, published reads).
+globs:
+  - "firestore.rules"
+  - "**/*rules*"
+---
+
+# Firestore Security Rules requirements
+
+## Users
+- A user can read their own user doc.
+- A user can update ONLY safe profile fields (displayName, photoURL, countryId, cityId).
+- `role` and `isActive` can only be changed by admin.
+
+## Workshops
+- Public read only if `status == "published"`.
+- Teacher can create/update only if `teacherId == auth.uid`.
+- Admin can read/write everything.
+
+## Sessions
+- Public read only if the parent workshop is published (or session is for a published workshop).
+- Teacher can create/update sessions only for their own workshops.
+
+## Enrollments
+- Student can create enrollment only for themselves (`studentId == auth.uid`).
+- Student can read only their enrollments.
+- Teacher can read enrollments where `teacherId == auth.uid`.
+- Admin full access.
+
+## Payments
+- Restrict reads to involved parties (student/teacher/admin).
+- Prevent client from updating `payments.status`; only server/admin can update it.
+- Later: allow backend webhook only (not client).
+
+## Reviews/Favorites/Blog
+- Favorites: user manages only their own.
+- Reviews: ideally require paid enrollment for that workshop (TODO allowed initially, but must be tracked).
+- Blog posts: public read only published; write only admin.
+

@@ -1,0 +1,337 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function: verificar si el usuario está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function: verificar si el usuario es admin
+    // Usa exists() para evitar errores si el documento no existe aún
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Helper function: verificar si el usuario es el dueño del documento
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Helper function: verificar si el usuario es profesor
+    // Usa exists() para evitar errores si el documento no existe aún
+    function isTeacher() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
+    }
+
+    // Helper: blog publicado en Firestore o post demo (id comienza con "demo-")
+    function isPublicBlogId(blogId) {
+      return blogId.matches('^demo-.*') ||
+             (exists(/databases/$(database)/documents/blogs/$(blogId)) &&
+              get(/databases/$(database)/documents/blogs/$(blogId)).data.status == 'published');
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    match /users/{userId} {
+      // Lectura: dueño, admin, o usuarios autenticados (evita scraping público anónimo)
+      allow read: if isOwner(userId) || isAdmin() || isAuthenticated();
+      
+      // Los usuarios pueden crear su propio documento al registrarse
+      allow create: if isOwner(userId) && 
+                       request.resource.data.keys().hasAll(['email', 'role']) &&
+                       request.resource.data.role in ['student', 'teacher'];
+      
+      // Los usuarios pueden actualizar solo campos seguros de su perfil
+      // NO pueden cambiar: role, isActive, createdAt
+      allow update: if isOwner(userId) &&
+                       // No permitir cambiar role
+                       request.resource.data.role == resource.data.role &&
+                       // No permitir cambiar isActive
+                       request.resource.data.isActive == resource.data.isActive &&
+                       // No permitir cambiar createdAt
+                       request.resource.data.createdAt == resource.data.createdAt;
+      
+      // Solo admin puede cambiar role e isActive
+      allow update: if isAdmin();
+    }
+    
+    // ============================================
+    // WORKSHOPS COLLECTION
+    // ============================================
+    match /workshops/{workshopId} {
+      // Lectura pública solo si está publicado
+      allow read: if resource.data.status == 'published';
+      
+      // Los profesores pueden leer sus propios talleres (incluso si no están publicados)
+      // Verificar que el documento existe y tiene teacherId antes de acceder
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+                     resource.data.teacherId == request.auth.uid;
+      
+      // Admin puede leer todo
+      allow read: if isAdmin();
+      
+      // Los profesores pueden crear talleres solo si son ellos mismos
+      allow create: if isAuthenticated() && 
+                       exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+                       request.resource.data.teacherId == request.auth.uid &&
+                       request.resource.data.status == 'draft';
+      
+      // Los profesores pueden actualizar solo sus propios talleres
+      allow update: if isAuthenticated() && 
+                       exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+                       resource.data.teacherId == request.auth.uid &&
+                       // No permitir cambiar teacherId
+                       request.resource.data.teacherId == resource.data.teacherId;
+      
+      // Los profesores pueden eliminar solo sus propios talleres
+      allow delete: if isAuthenticated() && 
+                       exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+                       resource.data.teacherId == request.auth.uid;
+      
+      // Admin puede crear/actualizar/eliminar todo
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // SESSIONS COLLECTION
+    // ============================================
+    match /sessions/{sessionId} {
+      // Lectura pública si el taller padre está publicado
+      allow read: if resource.data.workshopId != null &&
+                     get(/databases/$(database)/documents/workshops/$(resource.data.workshopId)).data.status == 'published';
+      
+      // Los profesores pueden leer sesiones de sus talleres
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+                     resource.data.workshopId != null &&
+                     get(/databases/$(database)/documents/workshops/$(resource.data.workshopId)).data.teacherId == request.auth.uid;
+      
+      // Admin puede leer todo
+      allow read: if isAdmin();
+      
+      // Los profesores pueden crear/actualizar sesiones solo para sus talleres
+      allow create, update: if isAuthenticated() && 
+                              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+                              request.resource.data.workshopId != null &&
+                              get(/databases/$(database)/documents/workshops/$(request.resource.data.workshopId)).data.teacherId == request.auth.uid;
+      
+      // Admin puede crear/actualizar todo
+      allow create, update: if isAdmin();
+    }
+    
+    // ============================================
+    // ENROLLMENTS COLLECTION
+    // ============================================
+    match /enrollments/{enrollmentId} {
+      // Los estudiantes pueden leer solo sus propias inscripciones
+      allow read: if isAuthenticated() && resource.data.studentId == request.auth.uid;
+      
+      // Los profesores pueden leer inscripciones de sus talleres
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+                     resource.data.workshopId != null &&
+                     get(/databases/$(database)/documents/workshops/$(resource.data.workshopId)).data.teacherId == request.auth.uid;
+      
+      // Admin puede leer todo
+      allow read: if isAdmin();
+      
+      // Los estudiantes pueden crear inscripciones solo para ellos mismos
+      allow create: if isAuthenticated() && 
+                       request.resource.data.studentId == request.auth.uid;
+      
+      // Los estudiantes pueden actualizar sus inscripciones (cancelar o cambiar sesión)
+      // pero NO pueden cambiar status a paid o refunded
+      allow update: if isAuthenticated() && 
+                       resource.data.studentId == request.auth.uid &&
+                       request.resource.data.status != 'paid' &&
+                       request.resource.data.status != 'refunded';
+      
+      // Admin puede crear/actualizar todo
+      allow create, update: if isAdmin();
+    }
+    
+    // ============================================
+    // PAYMENTS COLLECTION
+    // ============================================
+    match /payments/{paymentId} {
+      // Los estudiantes pueden leer sus propios pagos
+      allow read: if isAuthenticated() && resource.data.studentId == request.auth.uid;
+      
+      // Los profesores pueden leer pagos de sus talleres
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+                     resource.data.workshopId != null &&
+                     get(/databases/$(database)/documents/workshops/$(resource.data.workshopId)).data.teacherId == request.auth.uid;
+      
+      // Admin puede leer todo
+      allow read: if isAdmin();
+      
+      // Los estudiantes pueden crear pagos solo para ellos mismos
+      allow create: if isAuthenticated() && 
+                       request.resource.data.studentId == request.auth.uid &&
+                       // No permitir que el cliente establezca el status
+                       request.resource.data.status == 'pending';
+      
+      // NO permitir que el cliente actualice el status (solo admin/servidor)
+      allow update: if isAdmin() || 
+                       (isAuthenticated() && 
+                        request.resource.data.status == resource.data.status);
+    }
+    
+    // ============================================
+    // FAVORITES COLLECTION
+    // ============================================
+    match /favorites/{favoriteId} {
+      // Los usuarios pueden leer solo sus propios favoritos
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Los usuarios pueden crear/actualizar solo sus propios favoritos
+      allow create, update, delete: if isAuthenticated() && 
+                                        request.resource.data.userId == request.auth.uid;
+      
+      // Admin puede leer todo
+      allow read: if isAdmin();
+    }
+    
+    // ============================================
+    // REVIEWS COLLECTION
+    // ============================================
+    match /reviews/{reviewId} {
+      // Lectura pública de reseñas
+      allow read: if true;
+      
+      // Los usuarios autenticados pueden crear reseñas
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Los usuarios pueden actualizar solo sus propias reseñas
+      allow update, delete: if isAuthenticated() && 
+                               resource.data.userId == request.auth.uid;
+      
+      // Admin puede hacer todo
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // BLOG POSTS COLLECTION (colección `blogs`, alineada con src/services/blog.service.ts)
+    // ============================================
+    match /blogs/{postId} {
+      // Lectura pública solo si está publicado
+      allow read: if resource.data.status == 'published';
+      
+      // Admin puede leer todo
+      allow read: if isAdmin();
+      
+      // Solo admin puede crear/actualizar posts
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ============================================
+    // BLOG LIKES COLLECTION
+    // ============================================
+    match /blogLikes/{likeId} {
+      // Lectura pública si corresponde a un blog público/demo
+      allow read: if isPublicBlogId(resource.data.blogId);
+
+      // Solo usuarios autenticados pueden crear su propio like
+      allow create: if isAuthenticated() &&
+                      request.resource.data.userId == request.auth.uid &&
+                      isPublicBlogId(request.resource.data.blogId);
+
+      // Solo el dueño puede quitar su like
+      allow delete: if isAuthenticated() &&
+                      resource.data.userId == request.auth.uid;
+    }
+
+    // ============================================
+    // BLOG COMMENTS COLLECTION
+    // ============================================
+    match /blogComments/{commentId} {
+      // Lectura pública si corresponde a un blog público/demo
+      allow read: if isPublicBlogId(resource.data.blogId);
+
+      // Solo usuarios autenticados pueden comentar como sí mismos
+      allow create: if isAuthenticated() &&
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.text is string &&
+                      request.resource.data.text.size() >= 2 &&
+                      request.resource.data.text.size() <= 1000 &&
+                      isPublicBlogId(request.resource.data.blogId);
+
+      // Borrado: dueño del comentario o admin
+      allow delete: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+    }
+    
+    // ============================================
+    // CATEGORIES COLLECTION
+    // ============================================
+    match /categories/{categoryId} {
+      // Lectura pública de categorías activas
+      allow read: if resource.data.isActive == true;
+      
+      // Admin puede leer/crear/actualizar todo
+      allow read, create, update: if isAdmin();
+    }
+    
+    // ============================================
+    // COUNTRIES COLLECTION
+    // ============================================
+    match /countries/{countryId} {
+      // Lectura pública
+      allow read: if true;
+      
+      // Solo admin puede crear/actualizar
+      allow create, update: if isAdmin();
+    }
+    
+    // ============================================
+    // CITIES COLLECTION
+    // ============================================
+    // ============================================
+    // ATTENDANCE COLLECTION
+    // ============================================
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated() && 
+                     (resource.data.markedBy == request.auth.uid || 
+                      resource.data.studentId == request.auth.uid) || isAdmin();
+      allow create, update: if isAuthenticated() && 
+                               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+                               get(/databases/$(database)/documents/workshops/$(request.resource.data.workshopId)).data.teacherId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // NOTIFICATIONS COLLECTION
+    // ============================================
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read: if isAdmin();
+    }
+    
+    match /cities/{cityId} {
+      // Lectura pública
+      allow read: if true;
+      
+      // Solo admin puede crear/actualizar
+      allow create, update: if isAdmin();
+    }
+  }
+}

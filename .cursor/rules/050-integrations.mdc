@@ -1,0 +1,156 @@
+---
+description: External integrations rules (Mercado Pago, Google Maps, Google Calendar). Security + correct boundaries.
+globs:
+  - "src/app/api/**"
+  - "src/services/**"
+  - "src/lib/**"
+  - "src/hooks/**"
+  - "src/app/**"
+---
+
+# Integrations rules: Mercado Pago + Google Maps + Google Calendar
+
+## Golden rule (boundaries)
+- Anything involving secrets, signatures, webhooks, or OAuth tokens MUST be server-side.
+- Client-side code must never include private credentials.
+- Server-only environment variables must never use NEXT_PUBLIC_ prefix.
+
+---
+
+## 1) Mercado Pago (Payments)
+
+### What goes where
+- Client (browser):
+  - Starts a payment flow by calling our server endpoint to create a preference.
+  - Redirects user to Mercado Pago checkout URL.
+  - Shows payment status UI (reads from Firestore).
+- Server (Next.js Route Handlers under `src/app/api/...`):
+  - Creates Mercado Pago preference using MERCADOPAGO_ACCESS_TOKEN (server-only).
+  - Receives and verifies webhooks (signature/secret if available).
+  - Updates Firestore payment/enrollment statuses using Firebase Admin SDK (not client SDK).
+  - Note: Cloud Functions are optional for future scaling, but Next.js API routes are the primary approach.
+
+### Required server endpoints (recommended)
+- POST `/api/payments/mercadopago/preference`
+  - Input: enrollmentId
+  - Output: init_point (checkout URL) + preferenceId
+  - Must validate: caller is the enrollment owner (student) OR admin.
+- POST `/api/payments/mercadopago/webhook`
+  - Receives MP notifications
+  - Must verify authenticity (secret/signature if applicable)
+  - Must be idempotent (safe if called multiple times)
+  - Must update:
+    - `payments/{paymentId}.status`
+    - `enrollments/{enrollmentId}.status` -> "paid" when approved
+
+### Data & status rules
+- Firestore:
+  - `enrollments.status` can be set to "pending_payment" by student at creation time.
+  - Only server/admin can set to "paid"/"refunded".
+  - `payments.status` must be writable only by server/admin.
+- Never trust query params or client signals to mark a payment as approved.
+
+### Idempotency requirement
+- Webhook handler must:
+  - check if payment already processed (status already "approved")
+  - avoid double-incrementing counters
+  - store MP paymentId/preferenceId and use it as a unique key when possible
+
+---
+
+## 2) Google Maps (Location)
+
+### Client usage
+- Allowed on client:
+  - Rendering maps
+  - Place autocomplete (if using Places)
+  - Geocoding (optional, but rate-limited and key restricted)
+- Use a restricted API key:
+  - restrict by HTTP referrers (your domain + localhost for dev)
+  - do not expose unrestricted keys
+
+### Firestore location format (required)
+- Store on workshops:
+  - `location.addressText` (string)
+  - `location.cityId` / `location.countryId` (string or optional text fallback)
+  - `location.geo` (GeoPoint)
+  - `location.placeId` (optional)
+
+### Querying nearby workshops
+- If implementing "near me":
+  - Prefer a bounding-box query strategy or store city-based filters first.
+  - Avoid expensive full collection scans.
+  - If true geo-search is required later, consider a geo-index strategy (planned feature).
+
+---
+
+## 3) Google Calendar (Auto-add workshop to calendar)
+
+### Security & OAuth
+- Calendar requires OAuth; tokens must be stored securely server-side.
+- Client must never store raw refresh tokens in Firestore.
+- Use server routes for OAuth handshake and calendar event creation.
+
+### Recommended server endpoints
+- GET `/api/integrations/google/oauth/start`
+  - Redirect user to Google consent screen
+- GET `/api/integrations/google/oauth/callback`
+  - Exchange code for tokens
+  - Store tokens securely (server-side storage strategy)
+- POST `/api/calendar/create-event`
+  - Input: enrollmentId
+  - Validates: enrollment belongs to auth user and is status "paid"
+  - Creates calendar event and stores `calendarEventId` on enrollment
+
+### Trigger rule (when to create events)
+- Create calendar event only after enrollment is confirmed paid:
+  - after MP webhook marks `enrollments.status = "paid"`
+  - OR user manually clicks "Add to calendar" (but still requires paid status)
+- Must be idempotent:
+  - if `calendarEventId` exists, do not create duplicate events
+
+### Event content guidelines
+- Event title: workshop title
+- Description: address + teacher contact + app link
+- Location: addressText (and optionally map link)
+- Start/end: from `sessions.startAt/endAt`
+
+---
+
+## Cross-integration constraints
+
+### Never block MVP
+- Integrations must be feature-flagged:
+  - If MP/Calendar not implemented yet, enrollment stays "pending_payment" and UI shows "Pago en desarrollo" or similar.
+  - Do not ship insecure shortcuts (no permissive rules, no client-side payment status).
+
+### File placement conventions
+- API routes:
+  - `src/app/api/payments/mercadopago/*`
+  - `src/app/api/integrations/google/*`
+  - `src/app/api/calendar/*`
+- Services:
+  - `src/services/payments.service.ts` for Firestore reads (status)
+  - Do not put secret-bearing HTTP calls inside services used by client components.
+
+### Testing checklist (mandatory for each integration)
+- Mercado Pago:
+  - preference creation works
+  - webhook updates Firestore correctly
+  - duplicate webhook does not break counters/status
+- Google Calendar:
+  - OAuth connect flow works
+  - creates event only when paid
+  - repeated calls do not create duplicates
+- Maps:
+  - workshop location saved and rendered
+  - key restrictions documented
+
+---
+
+## Documentation requirement
+README must include:
+- How to configure Mercado Pago env vars and webhooks
+- How to configure Google OAuth + redirect URLs
+- How to configure Google Maps key restrictions
+- Which endpoints exist and how to test them locally (ngrok/tunnel for webhooks)

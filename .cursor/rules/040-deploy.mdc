@@ -1,0 +1,81 @@
+---
+description: Deployment & environment rules (Vercel + Next.js + Firebase). Prevent prod/local mismatches.
+globs:
+  - "README.md"
+  - "src/lib/env.ts"
+  - "src/lib/firebase.ts"
+  - "next.config.*"
+  - "package.json"
+  - ".env*"
+---
+
+# Deploy & environments (Vercel + Next.js + Firebase)
+
+## Environments
+- Support two environments: local development and production (Vercel).
+- Never commit secrets to git. `.env.local` must be in `.gitignore`.
+- All required environment variables must be validated in `src/lib/env.ts` with clear error messages.
+
+## Required env vars (Firebase client)
+- NEXT_PUBLIC_FIREBASE_API_KEY
+- NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+- NEXT_PUBLIC_FIREBASE_PROJECT_ID
+- NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+- NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+- NEXT_PUBLIC_FIREBASE_APP_ID
+
+## Optional env vars (future integrations)
+- MERCADOPAGO_ACCESS_TOKEN (server-only)
+- MERCADOPAGO_WEBHOOK_SECRET (server-only)
+- GOOGLE_CALENDAR_CLIENT_ID (server-only)
+- GOOGLE_CALENDAR_CLIENT_SECRET (server-only)
+- GOOGLE_CALENDAR_REDIRECT_URL (server-only)
+- GOOGLE_MAPS_API_KEY (can be public but must be restricted by referrers)
+
+Rules:
+- Any server-only env var must NOT be prefixed with NEXT_PUBLIC_.
+- Client code must never read server-only env vars.
+- If a feature requires server-only secrets, implement it via Next.js Route Handlers / API routes (or Cloud Functions), never in client components.
+
+## Deployment target (recommended)
+- Primary hosting: Vercel.
+- Use Vercel project settings to add env vars for Production and Preview.
+- After adding/changing env vars, trigger a redeploy.
+
+## Build correctness
+- Before declaring a feature done, ensure:
+  - `npm run build` passes locally
+  - `npm run lint` passes (if configured)
+- Avoid relying on dev-only behavior. Assume production is stricter.
+
+## URLs & Auth configuration
+- Firebase Auth must allow the deployed domain (Vercel URL/custom domain) under Authorized domains.
+- For Google Sign-In, ensure OAuth config supports:
+  - localhost (dev)
+  - production domain (Vercel)
+- App routing should not depend on absolute localhost URLs.
+
+## API routes / webhooks (payments/calendar)
+- Webhooks must be implemented server-side only (Route Handlers / API routes).
+- Any webhook endpoint must:
+  - verify signature/secret (when available)
+  - validate payload
+  - be idempotent (safe to receive duplicates)
+  - write to Firestore with minimal permissions (admin SDK later) or strict rules
+
+## Firestore Rules & Production safety
+- Never deploy to production with permissive Firestore rules (e.g., `allow read, write: if true`).
+- If rules are not ready for a feature, the UI must be gated/disabled for non-admin.
+
+## README requirements (must be kept updated)
+README.md must include:
+- Local setup steps
+- Required env vars list
+- How to run dev server
+- How to build for production
+- How to deploy to Vercel (high level)
+- Troubleshooting section for common env/auth domain issues
+
+## Logging & debugging
+- Avoid noisy console logs in production.
+- Prefer structured error messages in services; UI should show user-friendly messages.

@@ -1,0 +1,32 @@
+---
+description: Firestore data model & querying rules for workshops/sessions/enrollments/payments.
+globs:
+  - "src/services/**"
+  - "src/types/**"
+---
+
+# Firestore model rules
+
+## Collections (core)
+- `users`, `workshops`, `sessions`, `enrollments`, `payments`, `reviews`, `favorites`, `categories`, `blogPosts`
+
+## Design principles
+- Optimize for queries:
+  - Home lists published workshops.
+  - Teacher lists their workshops by `teacherId`.
+  - Teacher sees enrollments by `teacherId` and `workshopId/sessionId`.
+  - Student lists their enrollments by `studentId`.
+- Use server timestamps for `createdAt/updatedAt` when possible.
+- Use denormalization intentionally (e.g., store `teacherId` in enrollments) to enable simple queries.
+
+## Services API shape
+- Services should expose:
+  - `create*`, `update*`, `get*ById`, `list*`
+- Services must not depend on React.
+- Services should return typed objects and throw typed/structured errors.
+- Services use Firebase client SDK by default.
+- Server-side operations (webhooks, admin actions) should use Firebase Admin SDK via Next.js API routes, not through `src/services/*`.
+
+## Stats / counters
+- Treat `stats.*` as derived values.
+- Do not trust client to maintain counters; prefer transactions / server-side updates (later).

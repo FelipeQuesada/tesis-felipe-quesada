@@ -1,0 +1,32 @@
+---
+description: Global rules for the MiTaller web app (Next.js + Firebase). Always apply.
+alwaysApply: true
+---
+
+# Global rules (must follow)
+
+## Stack & architecture
+- Use Next.js App Router + TypeScript + React.
+- Use Firebase Auth (email/password + Google) and Firestore.
+- NEVER access Firestore directly from React components.
+- All Firestore reads/writes must go through `src/services/*`.
+- React components can only consume data through hooks in `src/hooks/*`.
+
+## Folder structure (required)
+- `src/lib/firebase.ts` initializes Firebase client SDK.
+- `src/lib/env.ts` validates required env vars and throws clear errors if missing.
+- `src/types/*` contains domain types (no duplication of shapes across files).
+- `src/services/*` contains data access functions only (no UI).
+- `src/hooks/*` contains hooks (auth + data).
+- `src/components/*` contains reusable UI.
+
+## Coding standards
+- TypeScript strict: avoid `any`.
+- Always handle loading, error, and empty states in UI.
+- Keep functions small and single-responsibility.
+- Prefer explicit names over abbreviations.
+
+## Security non-negotiables
+- Client must never be able to set `users.role` or `payments.status`.
+- Admin role cannot be self-assigned from the client.
+- If a feature affects auth/roles/payments, require a short plan + test checklist before coding.

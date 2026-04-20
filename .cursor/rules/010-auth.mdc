@@ -1,0 +1,21 @@
+---
+description: Rules for authentication flows and user role handling.
+globs:
+  - "src/**/auth/**"
+  - "src/hooks/**"
+  - "src/services/user*"
+  - "src/app/auth/**"
+---
+
+# Auth & roles rules
+
+- Support login/register via:
+  - Email/password
+  - Google sign-in
+- After signup/signin, ensure a `users/{uid}` document exists.
+- On Google sign-in: if `users/{uid}` doesn't exist, create it with role "student" by default.
+- Allow user to select only "student" or "teacher" at registration UI.
+- Never allow setting "admin" from the client UI.
+- Any role change must be restricted to admin-only operations (rules/backoffice).
+- Keep auth state in a single `AuthProvider` + `useAuth()` hook.
+
