@@ -11,7 +11,7 @@ import { blogCoverSrc } from '@/lib/blogDisplay';
 import { usePublishedBlogPost } from '@/hooks/useBlog';
 import { useBlogEngagement } from '@/hooks/useBlogEngagement';
 import { useAuth } from '@/contexts/AuthContext';
-import { listPublishedWorkshopsByCategoryIds } from '@/services/workshops.service';
+import { listPublishedWorkshopsByTeacherId } from '@/services/workshops.service';
 import type { Workshop } from '@/types';
 
 function BlogCoverImage({ src, alt }: { src: string; alt: string }) {
@@ -31,20 +31,20 @@ export default function BlogPostPage() {
   const { user } = useAuth();
   const blogId = params.id as string;
   const { post: blog, loading, error } = usePublishedBlogPost(blogId);
-  const { likesCount, likedByMe, comments, liking, commenting, toggleLike, addComment } =
+  const { likesCount, likedByMe, comments, liking, commenting, loadError, toggleLike, addComment } =
     useBlogEngagement(blogId, user?.uid ?? null);
   const [related, setRelated] = useState<Workshop[]>([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
   const [commentText, setCommentText] = useState('');
 
   useEffect(() => {
-    if (!blog?.categoryIds?.length) {
+    if (!blog?.authorId?.trim()) {
       setRelated([]);
       return;
     }
     let cancelled = false;
     setRelatedLoading(true);
-    listPublishedWorkshopsByCategoryIds(blog.categoryIds, 8)
+    listPublishedWorkshopsByTeacherId(blog.authorId, 8)
       .then((w) => {
         if (!cancelled) setRelated(w);
       })
@@ -57,7 +57,7 @@ export default function BlogPostPage() {
     return () => {
       cancelled = true;
     };
-  }, [blog?.categoryIds, blog?.id]);
+  }, [blog?.authorId, blog?.id]);
 
   if (loading) {
     return (
@@ -131,7 +131,11 @@ export default function BlogPostPage() {
       askForAuth('dar like');
       return;
     }
-    await toggleLike();
+    try {
+      await toggleLike();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo actualizar el me gusta.');
+    }
   };
 
   const handleAddComment = async () => {
@@ -247,6 +251,22 @@ export default function BlogPostPage() {
             {blog.content}
           </div>
 
+          {loadError ? (
+            <p
+              style={{
+                color: 'crimson',
+                fontSize: '0.9rem',
+                marginBottom: '1rem',
+                padding: '0.75rem',
+                background: '#fff5f5',
+                borderRadius: '8px',
+                border: '1px solid #fecaca',
+              }}
+            >
+              No se pudieron cargar likes ni comentarios: {loadError}
+            </p>
+          ) : null}
+
           <div className="material-card" style={{ marginBottom: '1rem' }}>
             <div
               style={{
@@ -340,21 +360,6 @@ export default function BlogPostPage() {
           ) : (
             <RelatedWorkshopsSection workshops={related} />
           )}
-
-          <p
-            style={{
-              marginTop: '2rem',
-              padding: '1rem',
-              background: 'var(--surface)',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            {blog.authorId === 'demo'
-              ? 'Artículo de demostración incluido en la app. Los posts reales los publica el administrador desde el panel y se guardan en Firestore.'
-              : 'Los comentarios y reacciones persistentes no están habilitados en esta versión; el contenido proviene de Firestore y lo gestiona el administrador.'}
-          </p>
         </div>
       </main>
       <BottomNav />

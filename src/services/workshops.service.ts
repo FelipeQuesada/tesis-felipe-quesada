@@ -266,6 +266,18 @@ export async function listPublishedWorkshopsByCategoryIds(
   return all.filter((w) => categoryIds.includes(w.categoryId)).slice(0, maxResults);
 }
 
+/** Talleres publicados del profesor (p. ej. blog del mismo autor). */
+export async function listPublishedWorkshopsByTeacherId(
+  teacherId: string,
+  maxResults = 8
+): Promise<Workshop[]> {
+  if (!teacherId?.trim()) return [];
+  const list = await listTeacherWorkshops(teacherId);
+  return list
+    .filter((w) => w.status === 'published')
+    .slice(0, maxResults);
+}
+
 /**
  * Lista talleres para administración (requiere rol admin en reglas).
  */

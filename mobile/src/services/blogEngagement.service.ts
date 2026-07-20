@@ -1,17 +1,17 @@
 import {
+  addDoc,
   collection,
+  deleteDoc,
   doc,
   getDocs,
   query,
   serverTimestamp,
   setDoc,
-  deleteDoc,
-  addDoc,
   where,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import type { BlogComment } from '@/types';
+import { db } from '../lib/firebase';
+import type { BlogComment } from '../types';
 
 const LIKES_COLLECTION = 'blogLikes';
 const COMMENTS_COLLECTION = 'blogComments';
@@ -116,4 +116,3 @@ export async function addBlogComment(input: {
     createdAt: serverTimestamp(),
   });
 }
-

@@ -62,6 +62,8 @@ for (const key of NEXT_PUBLIC_FIREBASE_KEYS) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  /** Oculta el indicador flotante (icono "N") en desarrollo; los errores siguen mostrándose cuando ocurren. */
+  devIndicators: false,
   env: envPublicFirebase,
   images: {
     unoptimized: false,

@@ -1,14 +1,16 @@
-'use client';
-
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  formatFirestoreLoadError,
+  runWithFirestoreRetry,
+} from '../lib/firestoreRetry';
 import {
   addBlogComment,
   getBlogLikesCount,
   isBlogLikedByUser,
   listBlogComments,
   toggleBlogLike,
-} from '@/services/blogEngagement.service';
-import type { BlogComment } from '@/types';
+} from '../services/blogEngagement.service';
+import type { BlogComment } from '../types';
 
 export function useBlogEngagement(blogId: string, userId: string | null) {
   const [likesCount, setLikesCount] = useState(0);
@@ -19,19 +21,20 @@ export function useBlogEngagement(blogId: string, userId: string | null) {
   const [liking, setLiking] = useState(false);
   const [commenting, setCommenting] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!blogId) return;
     setLoading(true);
     setLoadError(null);
     try {
-      const [likes, commentList] = await Promise.all([
-        getBlogLikesCount(blogId),
-        listBlogComments(blogId),
-      ]);
+      const [likes, commentList] = await runWithFirestoreRetry(() =>
+        Promise.all([getBlogLikesCount(blogId), listBlogComments(blogId)])
+      );
       let liked = false;
       if (userId) {
         try {
-          liked = await isBlogLikedByUser(blogId, userId);
+          liked = await runWithFirestoreRetry(() =>
+            isBlogLikedByUser(blogId, userId)
+          );
         } catch (likeErr) {
           console.warn('No se pudo verificar me gusta del usuario:', likeErr);
         }
@@ -40,24 +43,20 @@ export function useBlogEngagement(blogId: string, userId: string | null) {
       setComments(commentList);
       setLikedByMe(liked);
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : 'No se pudieron cargar likes ni comentarios.';
+      const formatted = formatFirestoreLoadError(err);
       console.error('Error cargando engagement del blog:', err);
-      setLoadError(msg);
+      setLoadError(formatted.message);
       setLikesCount(0);
       setComments([]);
       setLikedByMe(false);
     } finally {
       setLoading(false);
     }
-  };
+  }, [blogId, userId]);
 
   useEffect(() => {
-    void load().catch(() => {
-      setLoading(false);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blogId, userId]);
+    void load();
+  }, [load]);
 
   const onToggleLike = async () => {
     if (!userId || liking) return;
@@ -107,4 +106,3 @@ export function useBlogEngagement(blogId: string, userId: string | null) {
     refreshEngagement: load,
   };
 }
-

@@ -29,11 +29,29 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
     }
 
-    // Helper: blog publicado en Firestore o post demo (id comienza con "demo-")
+    // Artículos solo en la app (sin documento en `blogs`) — regex, sin get()
+    function isEmbeddedBlogId(blogId) {
+      return blogId is string && (
+        blogId.matches('^demo-.*') ||
+        blogId.matches('^blog-beneficio-.*')
+      );
+    }
+
+    // Artículo publicado en colección `blogs`
+    function isPublishedBlogInFirestore(blogId) {
+      return blogId is string
+        && exists(/databases/$(database)/documents/blogs/$(blogId))
+        && get(/databases/$(database)/documents/blogs/$(blogId)).data.status == 'published';
+    }
+
+    // Likes / comentarios: demo, embebidos o post publicado en Firestore
     function isPublicBlogId(blogId) {
-      return blogId.matches('^demo-.*') ||
-             (exists(/databases/$(database)/documents/blogs/$(blogId)) &&
-              get(/databases/$(database)/documents/blogs/$(blogId)).data.status == 'published');
+      return isEmbeddedBlogId(blogId) || isPublishedBlogInFirestore(blogId);
+    }
+
+    function canReadBlogEngagement() {
+      return resource.data.keys().hasAll(['blogId'])
+        && isPublicBlogId(resource.data.blogId);
     }
     
     // ============================================
@@ -201,9 +219,13 @@ service cloud.firestore {
       // Los usuarios pueden leer solo sus propios favoritos
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       
-      // Los usuarios pueden crear/actualizar solo sus propios favoritos
-      allow create, update, delete: if isAuthenticated() && 
-                                        request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+
+      allow delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      allow update: if false;
       
       // Admin puede leer todo
       allow read: if isAdmin();
@@ -246,35 +268,50 @@ service cloud.firestore {
     // BLOG LIKES COLLECTION
     // ============================================
     match /blogLikes/{likeId} {
-      // Lectura pública si corresponde a un blog público/demo
-      allow read: if isPublicBlogId(resource.data.blogId);
+      // getDoc cuando el usuario aún no dio like (el documento no existe)
+      allow get: if !exists(/databases/$(database)/documents/blogLikes/$(likeId));
 
-      // Solo usuarios autenticados pueden crear su propio like
+      // Lectura (lista y documento): compatible con query where blogId == ...
+      allow get, list: if canReadBlogEngagement();
+      // Embebidos: sin llamar a get() en blogs (mejor para consultas)
+      allow get, list: if resource.data.keys().hasAll(['blogId'])
+        && isEmbeddedBlogId(resource.data.blogId);
+      allow get, list: if resource.data.keys().hasAll(['blogId'])
+        && isPublishedBlogInFirestore(resource.data.blogId);
+
       allow create: if isAuthenticated() &&
-                      request.resource.data.userId == request.auth.uid &&
-                      isPublicBlogId(request.resource.data.blogId);
+        request.resource.data.keys().hasAll(['blogId', 'userId']) &&
+        request.resource.data.userId == request.auth.uid &&
+        isPublicBlogId(request.resource.data.blogId);
 
-      // Solo el dueño puede quitar su like
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.blogId == resource.data.blogId &&
+        isPublicBlogId(request.resource.data.blogId);
+
       allow delete: if isAuthenticated() &&
-                      resource.data.userId == request.auth.uid;
+        resource.data.userId == request.auth.uid;
     }
 
     // ============================================
     // BLOG COMMENTS COLLECTION
     // ============================================
     match /blogComments/{commentId} {
-      // Lectura pública si corresponde a un blog público/demo
-      allow read: if isPublicBlogId(resource.data.blogId);
+      allow get, list: if canReadBlogEngagement();
+      allow get, list: if resource.data.keys().hasAll(['blogId'])
+        && isEmbeddedBlogId(resource.data.blogId);
+      allow get, list: if resource.data.keys().hasAll(['blogId'])
+        && isPublishedBlogInFirestore(resource.data.blogId);
 
-      // Solo usuarios autenticados pueden comentar como sí mismos
       allow create: if isAuthenticated() &&
-                      request.resource.data.userId == request.auth.uid &&
-                      request.resource.data.text is string &&
-                      request.resource.data.text.size() >= 2 &&
-                      request.resource.data.text.size() <= 1000 &&
-                      isPublicBlogId(request.resource.data.blogId);
+        request.resource.data.keys().hasAll(['blogId', 'userId', 'text']) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() >= 2 &&
+        request.resource.data.text.size() <= 1000 &&
+        isPublicBlogId(request.resource.data.blogId);
 
-      // Borrado: dueño del comentario o admin
       allow delete: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
     }
     

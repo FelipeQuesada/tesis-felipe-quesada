@@ -12,6 +12,13 @@ import { useRouter } from 'next/navigation';
 import { getCategories } from '@/services/category.service';
 import type { Category, Workshop } from '@/types';
 
+const COUNTRY_NAME_TO_CODE: Record<string, string> = {
+  Argentina: 'AR',
+  Chile: 'CL',
+  Uruguay: 'UY',
+  Brasil: 'BR',
+};
+
 export default function ExploreWorkshopsPage() {
   const { workshops, loading, error } = usePublishedWorkshops();
   const router = useRouter();
@@ -54,12 +61,28 @@ export default function ExploreWorkshopsPage() {
   }, []);
 
   const categoryButtons = useMemo(() => {
-    const fromCatalog = catalogCategories.map((category) => category.name).filter(Boolean);
-    const fromWorkshops = workshops.map((workshop) => workshop.categoryId).filter(Boolean);
-    const unique = Array.from(new Set([...fromCatalog, ...fromWorkshops])).sort((a, b) =>
-      a.localeCompare(b, 'es')
-    );
-    return ['Todos', ...unique];
+    const options = [{ id: 'Todos', label: 'Todos' }];
+    const seen = new Set<string>(['Todos']);
+    const catalogById = new Map<string, string>();
+
+    for (const category of catalogCategories) {
+      if (!category.id) continue;
+      catalogById.set(category.id, category.name || category.id);
+      if (!seen.has(category.id)) {
+        options.push({ id: category.id, label: category.name || category.id });
+        seen.add(category.id);
+      }
+    }
+
+    for (const workshop of workshops) {
+      const id = workshop.categoryId;
+      if (!id || seen.has(id)) continue;
+      options.push({ id, label: catalogById.get(id) || id });
+      seen.add(id);
+    }
+
+    const sorted = options.slice(1).sort((a, b) => a.label.localeCompare(b.label, 'es'));
+    return [options[0], ...sorted];
   }, [catalogCategories, workshops]);
 
   const collapsedCategoryCount = 6;
@@ -84,9 +107,14 @@ export default function ExploreWorkshopsPage() {
       filtered = filtered.filter((w) => w.categoryId === selectedCategory);
     }
 
-    // Filtrar por país
+    // Filtrar por país (código ISO alineado al selector)
     if (selectedCountry) {
-      filtered = filtered.filter((w) => w.location.countryId === 'AR');
+      const code = COUNTRY_NAME_TO_CODE[selectedCountry];
+      if (code) {
+        filtered = filtered.filter(
+          (w) => (w.location?.countryId || '').toUpperCase() === code
+        );
+      }
     }
 
     // Filtrar por ubicación seleccionada
@@ -437,18 +465,18 @@ export default function ExploreWorkshopsPage() {
               >
                 {visibleCategories.map((category) => (
                   <button
-                    key={category}
-                    onClick={() => setSelectedCategory(category)}
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
                     style={{
                       padding: '0.5rem 1rem',
                       borderRadius: '20px',
                       border: 'none',
                       background:
-                        selectedCategory === category
+                        selectedCategory === category.id
                           ? 'var(--primary-green)'
                           : 'var(--surface)',
                       color:
-                        selectedCategory === category
+                        selectedCategory === category.id
                           ? 'white'
                           : 'var(--text-primary)',
                       fontSize: '0.875rem',
@@ -456,13 +484,13 @@ export default function ExploreWorkshopsPage() {
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
                       boxShadow:
-                        selectedCategory === category
+                        selectedCategory === category.id
                           ? 'var(--elevation-1)'
                           : 'none',
                       transition: 'all 0.2s',
                     }}
                   >
-                    {category}
+                    {category.label}
                   </button>
                 ))}
                 {categoryButtons.length > collapsedCategoryCount && (
