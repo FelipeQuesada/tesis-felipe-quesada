@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
-import { Roboto } from 'next/font/google';
+import { Nunito } from 'next/font/google';
 import './globals.css';
 import { FirebaseClientRoot } from '@/components/FirebaseClientRoot';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AuthWrapper } from '@/components/AuthWrapper';
 
-const roboto = Roboto({ 
-  weight: ['300', '400', '500', '700'],
+const nunito = Nunito({
+  weight: ['400', '600', '700', '800'],
   subsets: ['latin'],
   display: 'swap',
+  variable: '--font-nunito',
 });
 
 export const metadata: Metadata = {
@@ -23,7 +24,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={roboto.className}>
+      <body className={`${nunito.variable} ${nunito.className}`}>
         <FirebaseClientRoot>
           <AuthProvider>
             <AuthWrapper>{children}</AuthWrapper>

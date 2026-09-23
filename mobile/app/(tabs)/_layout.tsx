@@ -14,7 +14,7 @@ export default function TabsLayout() {
       screenOptions={{
         ...greenHeaderScreenOptions,
         tabBarShowLabel: false,
-        tabBarActiveTintColor: COLORS.primaryGreen,
+        tabBarActiveTintColor: COLORS.brandForest,
         tabBarInactiveTintColor: COLORS.textSecondary,
         tabBarIconStyle: { marginTop: 0 },
         tabBarStyle: {

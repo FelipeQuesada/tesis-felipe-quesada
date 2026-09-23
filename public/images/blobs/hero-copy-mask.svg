@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 320" preserveAspectRatio="none">
+  <!-- Panel izquierdo con borde derecho ondulado (mancha) -->
+  <path fill="white" d="
+    M0 0
+    H268
+    C292 18 278 48 292 78
+    C308 112 286 138 298 172
+    C312 208 288 236 300 268
+    C308 292 292 308 278 320
+    H0
+    Z"/>
+</svg>

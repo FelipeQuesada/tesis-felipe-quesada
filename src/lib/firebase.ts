@@ -17,6 +17,7 @@ let db: Firestore | undefined;
 let storage: FirebaseStorage | undefined;
 
 let clientReady = false;
+let initError: string | null = null;
 /** Evita inundar la consola si algo falla en bucle (p. ej. muchos re-renders). */
 let initErrorLogged = false;
 
@@ -45,8 +46,13 @@ export function ensureFirebaseClient(): void {
     db = getFirestore(app);
     storage = getStorage(app);
     clientReady = true;
+    initError = null;
     initErrorLogged = false;
   } catch (error) {
+    initError =
+      error instanceof Error
+        ? error.message
+        : 'No se pudo inicializar Firebase';
     if (!initErrorLogged) {
       initErrorLogged = true;
       console.error('Error inicializando Firebase:', error);
@@ -59,6 +65,10 @@ export function ensureFirebaseClient(): void {
 
 export function isFirebaseClientReady(): boolean {
   return clientReady;
+}
+
+export function getFirebaseInitError(): string | null {
+  return initError;
 }
 
 export { app, auth, db, storage };

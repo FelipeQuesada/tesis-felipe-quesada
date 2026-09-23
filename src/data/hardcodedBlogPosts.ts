@@ -19,7 +19,7 @@ En esta plataforma podés explorar por categoría, ubicación y fecha, ver el de
 Este artículo es una demostración: cuando publiques contenido real desde el panel de administración, los posts de Firestore se mezclarán con estas tarjetas de ejemplo o las reemplazarán en la lista, según cómo esté cargado tu proyecto.
 
 ¡Gracias por probar MiTaller!`,
-    coverImageUrl: '/images/promo.png',
+    coverImageUrl: '/images/stock-pintura.png',
     authorId: 'demo',
     authorName: 'Equipo MiTaller',
     status: 'published',
@@ -39,7 +39,7 @@ Usá los filtros de categoría para acotar resultados: cerámica, pintura, músi
 Cuando encuentres un taller que te interese, entrá al detalle para ver fechas, cupos y cómo inscribirte.
 
 (Texto de ejemplo — podés reemplazarlo con posts reales desde el admin.)`,
-    coverImageUrl: '/images/cerca.png',
+    coverImageUrl: '/images/stock-plantas.png',
     authorId: 'demo',
     authorName: 'Equipo MiTaller',
     status: 'published',
@@ -57,7 +57,7 @@ Cuando encuentres un taller que te interese, entrá al detalle para ver fechas, 
 MiTaller conecta a quienes enseñan con quienes quieren probar algo nuevo sin complicaciones.
 
 Este contenido es fijo en la app como muestra; los artículos administrados en Firestore aparecerán en el carrusel junto con estas entradas.`,
-    coverImageUrl: '/images/creativo.png',
+    coverImageUrl: '/images/stock-ceramica.png',
     authorId: 'demo',
     authorName: 'Equipo MiTaller',
     status: 'published',
@@ -80,7 +80,7 @@ Este contenido es fijo en la app como muestra; los artículos administrados en F
 4) Si sos profesor, después podés revisar alumnos y marcar asistencia desde tu panel.
 
 Este tutorial es fijo y forma parte de la ayuda inicial de la app.`,
-    coverImageUrl: '/images/3.png',
+    coverImageUrl: '/images/stock-floral.png',
     authorId: 'demo',
     authorName: 'Equipo MiTaller',
     status: 'published',

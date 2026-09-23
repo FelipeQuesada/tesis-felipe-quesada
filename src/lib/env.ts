@@ -22,6 +22,7 @@ type PublicEnvKey = (typeof requiredEnvVars)[number];
  * aunque existan en `.env.local` y en `next.config.js`. Fallback solo para `NODE_ENV === 'development'`.
  * En producción no hay fallback: las vars deben estar definidas en el build.
  */
+/** Valores alineados con Firebase Console (mitaller-app). Solo en desarrollo. */
 const DEV_PUBLIC_FIREBASE_FALLBACK: Record<PublicEnvKey, string> | null =
   process.env.NODE_ENV === 'development'
     ? {

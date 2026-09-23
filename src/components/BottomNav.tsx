@@ -168,12 +168,7 @@ const teacherNavItems: NavItem[] = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { user, loading } = useAuth();
-
-  // Debug: mostrar información del usuario
-  if (user && typeof window !== 'undefined') {
-    console.log('BottomNav - Usuario:', user.email, 'Rol:', user.role, 'Loading:', loading);
-  }
+  const { user } = useAuth();
 
   // No mostrar BottomNav para administradores
   if (user?.role === 'admin') {
@@ -182,34 +177,33 @@ export function BottomNav() {
 
   // Seleccionar items según rol
   const navItems = user?.role === 'teacher' ? teacherNavItems : studentNavItems;
-  
-  // Debug: mostrar qué items se están usando
-  if (user && typeof window !== 'undefined') {
-    console.log('BottomNav - Usando items:', navItems === teacherNavItems ? 'teacherNavItems' : 'studentNavItems');
-  }
 
   return (
     <nav className="bottom-nav">
-      {navItems.map((item) => {
-        const isActive =
-          pathname === item.href ||
-          (item.href === '/teacher/workshops' && pathname?.startsWith('/teacher/workshops')) ||
-          (item.href === '/dashboard/my-workshops' && pathname?.startsWith('/dashboard/my-workshops')) ||
-          (item.href === '/dashboard/account' && pathname?.startsWith('/dashboard/account')) ||
-          (item.href === '/teacher/account' && pathname?.startsWith('/teacher/account')) ||
-          (item.href === '/workshops' && pathname?.startsWith('/workshops')) ||
-          (item.href === '/teacher/home' && (pathname === '/teacher/home' || pathname === '/teacher'));
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`bottom-nav-item ${isActive ? 'active' : ''}`}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-          </Link>
-        );
-      })}
+      <div className="bottom-nav-inner">
+        {navItems.map((item) => {
+          const isActive =
+            pathname === item.href ||
+            (item.href === '/teacher/workshops' && pathname?.startsWith('/teacher/workshops')) ||
+            (item.href === '/dashboard/my-workshops' && pathname?.startsWith('/dashboard/my-workshops')) ||
+            (item.href === '/dashboard/account' && pathname?.startsWith('/dashboard/account')) ||
+            (item.href === '/teacher/account' && pathname?.startsWith('/teacher/account')) ||
+            (item.href === '/workshops' && pathname?.startsWith('/workshops')) ||
+            (item.href === '/teacher/home' && (pathname === '/teacher/home' || pathname === '/teacher'));
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`bottom-nav-item ${isActive ? 'active' : ''}`}
+              aria-label={item.label}
+              title={item.label}
+            >
+              {item.icon}
+              <span className="bottom-nav-label">{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

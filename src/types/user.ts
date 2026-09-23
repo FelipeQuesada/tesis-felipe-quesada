@@ -1,5 +1,7 @@
 export type UserRole = 'student' | 'teacher' | 'admin';
 export type DocumentType = 'dni' | 'pasaporte' | 'cedula' | 'otro';
+/** Género para saludos; sin valor → se usa forma universal "bienvenido". */
+export type UserGender = 'female' | 'male' | 'other';
 
 export interface User {
   uid: string;
@@ -10,6 +12,7 @@ export interface User {
   username?: string;
   firstName?: string;
   lastName?: string;
+  gender?: UserGender;
   countryId?: string;
   cityId?: string;
   birthDate?: string; // Formato: YYYY-MM-DD
@@ -30,6 +33,7 @@ export interface UserProfileUpdate {
   username?: string;
   firstName?: string;
   lastName?: string;
+  gender?: UserGender | null;
   photoURL?: string;
   countryId?: string;
   cityId?: string;
@@ -51,6 +55,14 @@ export interface UserRegistrationProfile {
   phoneNumber: string;
   documentType: DocumentType;
   documentNumber: string;
+}
+
+/**
+ * Forma del saludo. Default universal: "bienvenido".
+ * Solo "bienvenida" si el perfil indica género femenino.
+ */
+export function welcomeAdjective(gender?: UserGender | null): 'bienvenida' | 'bienvenido' {
+  return gender === 'female' ? 'bienvenida' : 'bienvenido';
 }
 
 /**

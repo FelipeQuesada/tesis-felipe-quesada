@@ -1,9 +1,10 @@
-# Variables de entorno para Firebase
-# Copia este contenido a .env.local
+# Variables de entorno para Firebase (web)
+# Copiá este archivo a `.env.local` en la raíz del proyecto.
+# En Vercel: Project → Settings → Environment Variables → las mismas claves → Redeploy.
 
-NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyB7wIdK2_jWHG08jxqZ1dKU_PWcLC_ej-E
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyB7wIdK2_jWHGO8jxqZ1dKU_PWcLC_ej-E
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=mitaller-app.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=mitaller-app
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=mitaller-app.appspot.com
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=mitaller-app.firebasestorage.app
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=109270054352
 NEXT_PUBLIC_FIREBASE_APP_ID=1:109270054352:web:0e6c1bc8e2b537c41135d5

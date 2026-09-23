@@ -9,6 +9,7 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { DocumentType, User, UserProfileUpdate, UserRole } from '@/types';
@@ -44,6 +45,7 @@ function docToUser(docId: string, data: any): User {
     username: data.username,
     firstName: data.firstName,
     lastName: data.lastName,
+    gender: data.gender,
     countryId: data.countryId,
     cityId: data.cityId,
     birthDate: data.birthDate,
@@ -158,8 +160,20 @@ export async function updateProfileFields(
   const docRef = doc(db, COLLECTION, uid);
   
   // Preparar datos para actualizar
-  const updateData: any = { ...updates };
-  
+  const updateData: Record<string, unknown> = { ...updates };
+
+  // Quitar undefined (Firestore no lo acepta bien)
+  Object.keys(updateData).forEach((key) => {
+    if (updateData[key] === undefined) {
+      delete updateData[key];
+    }
+  });
+
+  // Limpiar género → borrar campo (saludo vuelve a "bienvenido")
+  if (updates.gender === null || updates.gender === ('' as never)) {
+    updateData.gender = deleteField();
+  }
+
   // Si se actualiza birthDate, calcular age automáticamente
   if (updates.birthDate) {
     updateData.age = calculateAge(updates.birthDate);

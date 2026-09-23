@@ -1,11 +1,10 @@
 import { resolvePublicAssetUri } from './siteAssets';
+import { stockCoverByIndex } from './stockImages';
 
-const DEFAULT_COVER = '/images/resina.png';
-
-export function blogCoverUri(coverImageUrl?: string): string | null {
-  const raw =
+export function blogCoverUri(coverImageUrl?: string, index = 0): string | null {
+  const path =
     coverImageUrl && coverImageUrl.trim() !== ''
       ? coverImageUrl.trim()
-      : DEFAULT_COVER;
-  return resolvePublicAssetUri(raw);
+      : stockCoverByIndex(index);
+  return resolvePublicAssetUri(path);
 }

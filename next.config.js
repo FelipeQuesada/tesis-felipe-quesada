@@ -59,6 +59,14 @@ for (const key of NEXT_PUBLIC_FIREBASE_KEYS) {
   }
 }
 
+if (Object.keys(envPublicFirebase).length < NEXT_PUBLIC_FIREBASE_KEYS.length) {
+  const missing = NEXT_PUBLIC_FIREBASE_KEYS.filter((k) => !(k in envPublicFirebase));
+  console.warn(
+    `[next.config] Faltan variables Firebase en el build: ${missing.join(', ')}. ` +
+      'En local usá `.env.local`. En Vercel: Settings → Environment Variables → Redeploy.'
+  );
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

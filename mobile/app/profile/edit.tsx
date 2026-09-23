@@ -26,7 +26,7 @@ import { getCategories } from '../../src/services/category.service';
 import { uploadProfileImageFromUri } from '../../src/services/storage.service';
 import { updateProfileFields } from '../../src/services/user.service';
 import type { Category } from '../../src/types';
-import { calculateAge, type UserProfileUpdate } from '../../src/types/user';
+import { calculateAge, type UserGender, type UserProfileUpdate } from '../../src/types/user';
 
 export default function ProfileEditScreen() {
   const router = useRouter();
@@ -34,6 +34,7 @@ export default function ProfileEditScreen() {
   const [form, setForm] = useState<UserProfileUpdate>({
     displayName: '',
     photoURL: '',
+    gender: undefined,
     countryId: '',
     cityId: '',
     birthDate: '',
@@ -71,6 +72,7 @@ export default function ProfileEditScreen() {
       setForm({
         displayName: user.displayName || '',
         photoURL: user.photoURL || '',
+        gender: user.gender,
         countryId: user.countryId || '',
         cityId: user.cityId || '',
         birthDate: user.birthDate || '',
@@ -157,6 +159,7 @@ export default function ProfileEditScreen() {
         ...form,
         displayName: name,
         photoURL: finalPhoto || undefined,
+        gender: form.gender ?? null,
         countryId: form.countryId?.trim() || undefined,
         cityId: form.cityId?.trim() || undefined,
         birthDate: form.birthDate?.trim() || undefined,
@@ -238,6 +241,32 @@ export default function ProfileEditScreen() {
           editable={false}
         />
         <Text style={styles.hint}>El email no se puede cambiar desde la app.</Text>
+
+        <Text style={styles.lbl}>Género</Text>
+        <View style={styles.genderRow}>
+          {(
+            [
+              { value: undefined, label: 'No decir' },
+              { value: 'female' as UserGender, label: 'Femenino' },
+              { value: 'male' as UserGender, label: 'Masculino' },
+              { value: 'other' as UserGender, label: 'Otro' },
+            ] as const
+          ).map((opt) => {
+            const selected = form.gender === opt.value || (!form.gender && opt.value === undefined);
+            return (
+              <Pressable
+                key={opt.label}
+                style={[styles.genderChip, selected && styles.genderChipOn]}
+                onPress={() => setForm((p) => ({ ...p, gender: opt.value }))}
+              >
+                <Text style={[styles.genderChipTxt, selected && styles.genderChipTxtOn]}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.hint}>Se usa para el saludo (por defecto: bienvenido).</Text>
 
         <Text style={styles.lbl}>Fecha de nacimiento (AAAA-MM-DD)</Text>
         <TextInput
@@ -418,6 +447,32 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: 6,
     marginTop: 12,
+  },
+  genderRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  genderChip: {
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    backgroundColor: COLORS.surface,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  genderChipOn: {
+    borderColor: COLORS.primaryGreen,
+    backgroundColor: COLORS.primaryGreenLight,
+  },
+  genderChipTxt: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  genderChipTxtOn: {
+    color: COLORS.primaryGreenDark,
   },
   input: {
     borderWidth: 1,

@@ -9,6 +9,7 @@ import {
   setDoc,
   updateDoc,
   Timestamp,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { DocumentType, User, UserProfileUpdate, UserRole } from '../types';
@@ -38,6 +39,7 @@ function docToUser(docId: string, data: Record<string, unknown>): User {
     username: data.username as string | undefined,
     firstName: data.firstName as string | undefined,
     lastName: data.lastName as string | undefined,
+    gender: data.gender as User['gender'],
     countryId: data.countryId as string | undefined,
     cityId: data.cityId as string | undefined,
     birthDate,
@@ -153,6 +155,10 @@ export async function updateProfileFields(
     if (val !== undefined) {
       payload[key] = val;
     }
+  }
+
+  if (updates.gender === null) {
+    payload.gender = deleteField();
   }
 
   if (updates.birthDate?.trim()) {

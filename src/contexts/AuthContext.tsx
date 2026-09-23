@@ -49,37 +49,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setFirebaseUser(firebaseUser);
 
-      if (firebaseUser) {
-        // Get user document
-        let userDoc = await getUserDoc(firebaseUser.uid);
-        if (!userDoc) {
-          const isGoogleProvider = firebaseUser.providerData.some(
-            (provider) => provider.providerId === 'google.com'
-          );
-          // Solo auto-crear para Google. Para email/password, lo crea signUp().
-          if (isGoogleProvider) {
-            userDoc = await upsertUserDoc(firebaseUser.uid, {
-              email: firebaseUser.email || '',
-              displayName: firebaseUser.displayName,
-              photoURL: firebaseUser.photoURL,
-              role: 'student',
-            });
-          } else {
-            console.warn(
-              'AuthContext - Usuario autenticado sin documento en Firestore (email/password).'
+      try {
+        if (firebaseUser) {
+          // Get user document
+          let userDoc = await getUserDoc(firebaseUser.uid);
+          if (!userDoc) {
+            const isGoogleProvider = firebaseUser.providerData.some(
+              (provider) => provider.providerId === 'google.com'
             );
-            setUser(null);
-            setLoading(false);
-            return;
+            // Solo auto-crear para Google. Para email/password, lo crea signUp().
+            if (isGoogleProvider) {
+              userDoc = await upsertUserDoc(firebaseUser.uid, {
+                email: firebaseUser.email || '',
+                displayName: firebaseUser.displayName,
+                photoURL: firebaseUser.photoURL,
+                role: 'student',
+              });
+            } else {
+              console.warn(
+                'AuthContext - Usuario autenticado sin documento en Firestore (email/password).'
+              );
+              setUser(null);
+              return;
+            }
           }
+          console.log('AuthContext - Usuario cargado:', userDoc.email, 'Rol:', userDoc.role);
+          setUser(userDoc);
+        } else {
+          setUser(null);
         }
-        console.log('AuthContext - Usuario cargado:', userDoc.email, 'Rol:', userDoc.role);
-        setUser(userDoc);
-      } else {
+      } catch (err) {
+        console.error('AuthContext - Error cargando perfil de usuario:', err);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     });
 
     return () => unsubscribe();

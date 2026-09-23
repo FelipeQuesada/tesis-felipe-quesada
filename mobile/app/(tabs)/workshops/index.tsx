@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import type { Href } from 'expo-router';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { usePublishedWorkshops } from '../../../src/hooks/usePublishedWorkshops';
 import { useAuth } from '../../../src/hooks/useAuth';
@@ -68,6 +68,7 @@ export default function WorkshopsListScreen() {
     }, [refreshFavorites])
   );
 
+  const params = useLocalSearchParams<{ q?: string }>();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [catalogCategories, setCatalogCategories] = useState<Category[]>([]);
@@ -81,6 +82,11 @@ export default function WorkshopsListScreen() {
   const [language, setLanguage] = useState('');
   const [minRating, setMinRating] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const q = typeof params.q === 'string' ? params.q : Array.isArray(params.q) ? params.q[0] : '';
+    if (q) setSearchQuery(q);
+  }, [params.q]);
 
   useEffect(() => {
     let cancelled = false;
