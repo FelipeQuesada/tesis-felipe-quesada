@@ -103,7 +103,7 @@ function QuickTile({
 
 export function HomeQuickLinks() {
   return (
-    <View style={styles.grid} accessibilityRole="navigation" accessibilityLabel="Accesos rápidos">
+    <View style={styles.grid} accessibilityLabel="Accesos rápidos">
       {LINKS.map((item) => (
         <QuickTile key={item.label} {...item} />
       ))}
