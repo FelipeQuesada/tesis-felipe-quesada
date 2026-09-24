@@ -21,7 +21,7 @@ export function HomeWelcomeHero() {
       <div className="home-hero-media" aria-hidden>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/images/stock-pintura.png"
+          src="/images/home-hero.jpg"
           alt=""
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = 'none';

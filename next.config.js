@@ -42,29 +42,28 @@ function loadEnvLocalIntoProcess() {
 
 loadEnvLocalIntoProcess();
 
-const NEXT_PUBLIC_FIREBASE_KEYS = [
-  'NEXT_PUBLIC_FIREBASE_API_KEY',
-  'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-  'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-  'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-  'NEXT_PUBLIC_FIREBASE_APP_ID',
-];
+/**
+ * Config web pública de Firebase (mitaller-app). No son secretos de servidor:
+ * siempre van al browser. Sirven de respaldo si Vercel omite alguna key en el build.
+ */
+const FIREBASE_PUBLIC_DEFAULTS = {
+  NEXT_PUBLIC_FIREBASE_API_KEY: 'AIzaSyB7wIdK2_jWHG08jxqZ1dKU_PWcLC_ej-E',
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'mitaller-app.firebaseapp.com',
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'mitaller-app',
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'mitaller-app.firebasestorage.app',
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '109270054352',
+  NEXT_PUBLIC_FIREBASE_APP_ID: '1:109270054352:web:0e6c1bc8e2b537c41135d5',
+};
+
+const NEXT_PUBLIC_FIREBASE_KEYS = Object.keys(FIREBASE_PUBLIC_DEFAULTS);
 
 const envPublicFirebase = {};
 for (const key of NEXT_PUBLIC_FIREBASE_KEYS) {
   const v = process.env[key];
-  if (v != null && String(v).trim() !== '') {
-    envPublicFirebase[key] = v;
-  }
-}
-
-if (Object.keys(envPublicFirebase).length < NEXT_PUBLIC_FIREBASE_KEYS.length) {
-  const missing = NEXT_PUBLIC_FIREBASE_KEYS.filter((k) => !(k in envPublicFirebase));
-  console.warn(
-    `[next.config] Faltan variables Firebase en el build: ${missing.join(', ')}. ` +
-      'En local usá `.env.local`. En Vercel: Settings → Environment Variables → Redeploy.'
-  );
+  envPublicFirebase[key] =
+    v != null && String(v).trim() !== ''
+      ? String(v).trim()
+      : FIREBASE_PUBLIC_DEFAULTS[key];
 }
 
 /** @type {import('next').NextConfig} */

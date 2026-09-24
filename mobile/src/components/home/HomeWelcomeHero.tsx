@@ -31,7 +31,7 @@ export function HomeWelcomeHero() {
     ];
   }, [firstName, welcome]);
 
-  const heroUri = resolvePublicAssetUri('/images/stock-pintura.png');
+  const heroUri = resolvePublicAssetUri('/images/home-hero.jpg');
 
   return (
     <View style={[styles.hero, { height: heroH }]}>
