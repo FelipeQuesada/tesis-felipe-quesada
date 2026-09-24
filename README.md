@@ -61,22 +61,24 @@ npm install
 
 ### 4. Configurar variables de entorno
 
-1. Crea un archivo `.env.local` en la raíz del proyecto:
+1. En la raíz del proyecto, copiá la plantilla:
 
 ```bash
-cp .env.local.example .env.local
+cp .env.example .env.local
 ```
 
-2. Edita `.env.local` y completa con tus credenciales de Firebase:
+2. Editá `.env.local` con las credenciales de Firebase (Project Settings → Your apps):
 
 ```env
 NEXT_PUBLIC_FIREBASE_API_KEY=tu_api_key_aqui
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=tu_project_id.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=tu_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=tu_project_id.appspot.com
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=tu_project_id.firebasestorage.app
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu_sender_id
 NEXT_PUBLIC_FIREBASE_APP_ID=tu_app_id
 ```
+
+`.env.local` es el nombre correcto para Next.js; no lo subas a Git. En Vercel cargá las mismas keys (tipo Config).
 
 ### 5. Desplegar Firestore Security Rules
 
