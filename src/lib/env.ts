@@ -5,7 +5,8 @@
  * IMPORTANTE: Next solo inyecta `NEXT_PUBLIC_*` con acceso literal
  * (`process.env.NEXT_PUBLIC_FOO`). `process.env[name]` queda vacío en el browser.
  *
- * Los defaults coinciden con next.config.js (config web pública de mitaller-app).
+ * La única fuente es `.env.local` (local) o Environment Variables en Vercel.
+ * No hay claves de respaldo en el código: un valor hardcodeado distinto rompe Firestore.
  */
 
 import type { FirebaseOptions } from 'firebase/app';
@@ -21,15 +22,6 @@ const requiredEnvVars = [
 
 type PublicEnvKey = (typeof requiredEnvVars)[number];
 
-const FIREBASE_PUBLIC_DEFAULTS: Record<PublicEnvKey, string> = {
-  NEXT_PUBLIC_FIREBASE_API_KEY: 'AIzaSyB7wIdK2_jWHG08jxqZ1dKU_PWcLC_ej-E',
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'mitaller-app.firebaseapp.com',
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'mitaller-app',
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'mitaller-app.firebasestorage.app',
-  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '109270054352',
-  NEXT_PUBLIC_FIREBASE_APP_ID: '1:109270054352:web:0e6c1bc8e2b537c41135d5',
-};
-
 /** Lecturas literales para que el bundler las reemplace en build (Vercel / next build). */
 const PUBLIC_FIREBASE_ENV: Record<PublicEnvKey, string | undefined> = {
   NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -44,10 +36,7 @@ const PUBLIC_FIREBASE_ENV: Record<PublicEnvKey, string | undefined> = {
 
 export function getPublicFirebaseEnvVar(name: PublicEnvKey): string {
   const raw = PUBLIC_FIREBASE_ENV[name];
-  if (raw && raw.trim() !== '') {
-    return raw.trim();
-  }
-  return FIREBASE_PUBLIC_DEFAULTS[name];
+  return raw && raw.trim() !== '' ? raw.trim() : '';
 }
 
 export function validateEnvVars(): void {

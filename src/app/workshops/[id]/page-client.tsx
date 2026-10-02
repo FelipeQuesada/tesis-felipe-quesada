@@ -100,7 +100,7 @@ export default function WorkshopDetailPage({ id }: { id: string }) {
                 }}
                 aria-label={isFavorite(workshop.id) ? 'Quitar de favoritos' : 'Guardar en favoritos'}
               >
-                {isFavorite(workshop.id) ? '❤️' : '🤍'}
+                {isFavorite(workshop.id) ? '★' : '☆'}
               </button>
             )}
             {user?.role === 'teacher' && workshop.teacherId === user.uid && (

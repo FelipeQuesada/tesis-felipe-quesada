@@ -1,9 +1,26 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import { useFavorites } from '@/hooks/useFavorites';
 import { usePublishedWorkshops } from '@/hooks/useWorkshops';
 import { stockCoverByCategory, stockCoverByIndex } from '@/lib/stockImages';
 import { getCategoryChipStyle } from '@/lib/categoryColors';
+
+function StarIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M12 2.6l2.7 5.5 6 .9-4.4 4.2 1 6-5.3-2.8-5.3 2.8 1-6L3.3 9l6-.9L12 2.6z"
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function coverOf(url?: string, categoryId?: string, index = 0): string {
   if (url && url.trim()) return url;
@@ -11,6 +28,9 @@ function coverOf(url?: string, categoryId?: string, index = 0): string {
 }
 
 export function HomeRecommendedWorkshops() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites(user?.uid || null);
   const { workshops, loading } = usePublishedWorkshops();
   const list = [...workshops]
     .sort((a, b) => {
@@ -52,9 +72,24 @@ export function HomeRecommendedWorkshops() {
                       (e.currentTarget as HTMLImageElement).style.opacity = '0.35';
                     }}
                   />
-                  <span className="home-heart" aria-hidden>
-                    ♡
-                  </span>
+                  <button
+                    type="button"
+                    className={`home-fav${isFavorite(w.id) ? ' is-on' : ''}`}
+                    aria-label={
+                      isFavorite(w.id) ? 'Quitar de favoritos' : 'Guardar en favoritos'
+                    }
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!user) {
+                        router.push('/auth/login');
+                        return;
+                      }
+                      void toggleFavorite(w.id);
+                    }}
+                  >
+                    <StarIcon filled={isFavorite(w.id)} />
+                  </button>
                 </div>
                 <div className="home-workshop-body">
                   <span className="home-chip" style={{ background: chip.bg, color: chip.color }}>

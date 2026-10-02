@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import type { Attendance } from '@/types';
 
 const COLLECTION = 'attendance';
@@ -40,7 +40,7 @@ function docToAttendance(docId: string, data: any): Attendance {
 export async function getAttendanceBySession(
   sessionId: string
 ): Promise<Attendance[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   const q = query(colRef, where('sessionId', '==', sessionId));
   const snap = await getDocs(q);
@@ -58,7 +58,7 @@ export async function setAttendance(
   teacherId: string,
   present: boolean
 ): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const id = `${sessionId}_${enrollmentId}`;
   const docRef = doc(db, COLLECTION, id);
   const docSnap = await getDoc(docRef);

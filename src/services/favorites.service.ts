@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import type { Favorite } from '@/types';
 
 const COLLECTION = 'favorites';
@@ -37,7 +37,7 @@ export async function addFavorite(
   userId: string,
   workshopId: string
 ): Promise<Favorite> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
 
   const existing = await getFavorite(userId, workshopId);
   if (existing) return existing;
@@ -59,7 +59,7 @@ export async function removeFavorite(
   userId: string,
   workshopId: string
 ): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const fav = await getFavorite(userId, workshopId);
   if (fav) {
     const docRef = doc(db, COLLECTION, fav.id);
@@ -74,7 +74,7 @@ export async function getFavorite(
   userId: string,
   workshopId: string
 ): Promise<Favorite | null> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   const q = query(
     colRef,
@@ -90,7 +90,7 @@ export async function getFavorite(
  * Lists all favorites for a user (returns Favorite objects with workshopIds)
  */
 export async function listUserFavorites(userId: string): Promise<Favorite[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   const q = query(colRef, where('userId', '==', userId));
   const snap = await getDocs(q);

@@ -6,7 +6,7 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import type { Category } from '@/types';
 
 const CATEGORIES_COLLECTION = 'categories';
@@ -25,7 +25,7 @@ function mapCategoryDoc(id: string, data: Record<string, unknown>): Category {
  * y ordena en el cliente para no requerir índice compuesto isActive+name.
  */
 export async function getCategories(): Promise<Category[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, CATEGORIES_COLLECTION);
   const q = query(colRef, where('isActive', '==', true));
   const querySnapshot = await getDocs(q);
@@ -39,7 +39,7 @@ export async function getCategories(): Promise<Category[]> {
  * Obtiene una categoría por ID
  */
 export async function getCategoryById(categoryId: string): Promise<Category | null> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, CATEGORIES_COLLECTION, categoryId);
   const docSnap = await getDoc(docRef);
 

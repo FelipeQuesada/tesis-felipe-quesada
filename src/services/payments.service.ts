@@ -8,7 +8,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import type { Payment } from '@/types';
 
 const COLLECTION = 'payments';
@@ -40,7 +40,7 @@ function docToPayment(docId: string, data: any): Payment {
  * Gets payment by ID (readable by student, teacher, admin)
  */
 export async function getPaymentById(paymentId: string): Promise<Payment | null> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, paymentId);
   const docSnap = await getDoc(docRef);
   if (!docSnap.exists()) return null;
@@ -53,7 +53,7 @@ export async function getPaymentById(paymentId: string): Promise<Payment | null>
 export async function getPaymentByEnrollmentId(
   enrollmentId: string
 ): Promise<Payment | null> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   const q = query(colRef, where('enrollmentId', '==', enrollmentId));
   const snap = await getDocs(q);

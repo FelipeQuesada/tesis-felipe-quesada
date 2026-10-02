@@ -46,18 +46,24 @@ let initErrorLogged = false;
  * Inicializa Firebase una sola vez (Expo / React Native).
  * Misma base que la web; solo cambia el prefijo de variables (EXPO_PUBLIC_*).
  */
+const APP_NAME = 'mitaller';
+
 export function ensureFirebaseClient(): void {
-  if (clientReady) {
+  if (clientReady && app && auth && db && storage) {
     return;
   }
 
   try {
     validateFirebaseEnv();
+    const config = getFirebaseClientConfig();
+    const current = getApps().find((item) => item.name === APP_NAME);
 
-    if (getApps().length === 0) {
-      app = initializeApp(getFirebaseClientConfig());
+    if (current && current.options.apiKey === config.apiKey) {
+      app = current;
+    } else if (!current) {
+      app = initializeApp(config, APP_NAME);
     } else {
-      app = getApps()[0];
+      app = initializeApp(config, `${APP_NAME}-actual`);
     }
 
     auth = getAuth(app);
@@ -66,6 +72,7 @@ export function ensureFirebaseClient(): void {
     clientReady = true;
     initErrorLogged = false;
   } catch (error) {
+    clientReady = false;
     if (!initErrorLogged) {
       initErrorLogged = true;
       console.error('Error inicializando Firebase (mobile):', error);

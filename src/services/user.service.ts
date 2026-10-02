@@ -11,7 +11,7 @@ import {
   Timestamp,
   deleteField,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import type { DocumentType, User, UserProfileUpdate, UserRole } from '@/types';
 import { calculateAge } from '@/types/user';
 
@@ -66,7 +66,7 @@ function docToUser(docId: string, data: any): User {
  * Gets user document by UID
  */
 export async function getUserDoc(uid: string): Promise<User | null> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, uid);
   const docSnap = await getDoc(docRef);
 
@@ -96,7 +96,7 @@ export async function upsertUserDoc(
     documentNumber?: string;
   }
 ): Promise<User> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, uid);
   const docSnap = await getDoc(docRef);
 
@@ -156,7 +156,7 @@ export async function updateProfileFields(
   uid: string,
   updates: UserProfileUpdate
 ): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, uid);
   
   // Preparar datos para actualizar
@@ -189,7 +189,7 @@ export async function updateProfileFields(
  * Lists users (admin only - for small datasets, limit 100)
  */
 export async function listUsers(maxCount = 100): Promise<User[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   const q = query(colRef, limit(maxCount));
   const snap = await getDocs(q);
@@ -203,7 +203,7 @@ export async function updateUserIsActive(
   uid: string,
   isActive: boolean
 ): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, uid);
   await updateDoc(docRef, {
     isActive,
@@ -218,7 +218,7 @@ export async function updateUserRole(
   uid: string,
   role: UserRole
 ): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, uid);
   await updateDoc(docRef, {
     role,

@@ -1,21 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Pressable,
   RefreshControl,
-  SectionList,
+  FlatList,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { Link, useRouter, useFocusEffect } from 'expo-router';
+import { Link, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useStudentEnrollments } from '../../src/hooks/useStudentEnrollments';
 import { useFavorites } from '../../src/hooks/useFavorites';
 import { getWorkshopById } from '../../src/services/workshops.service';
 import { COLORS } from '../../src/constants/theme';
+import { resolvePublicAssetUri } from '../../src/lib/siteAssets';
+import { stockCoverByCategory, stockCoverByIndex } from '../../src/lib/stockImages';
 import type { Enrollment, Workshop } from '../../src/types';
 
 function enrollmentStatusLabel(status: Enrollment['status']): string {
@@ -33,15 +35,26 @@ function enrollmentStatusLabel(status: Enrollment['status']): string {
   }
 }
 
-function isEnrollment(item: Workshop | Enrollment): item is Enrollment {
-  return 'sessionId' in item && 'studentId' in item;
+function coverUri(workshop: Workshop | undefined, index: number): string | null {
+  const path =
+    workshop?.coverImageUrl?.trim() ||
+    stockCoverByCategory(workshop?.categoryId) ||
+    stockCoverByIndex(index);
+  if (!path) return null;
+  return path.startsWith('http') ? path : resolvePublicAssetUri(path);
 }
 
-type SectionRow = {
-  title: string;
-  kind: 'saved' | 'enrolled';
-  data: (Workshop | Enrollment)[];
-};
+function formatPrice(workshop: Workshop): string {
+  try {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: workshop.currency || 'ARS',
+      maximumFractionDigits: 0,
+    }).format(workshop.price);
+  } catch {
+    return `${workshop.currency ?? ''} ${workshop.price}`;
+  }
+}
 
 export default function MyWorkshopsScreen() {
   const router = useRouter();
@@ -60,6 +73,8 @@ export default function MyWorkshopsScreen() {
   const [favoriteWorkshops, setFavoriteWorkshops] = useState<Workshop[]>([]);
   const [loadingFavWorkshops, setLoadingFavWorkshops] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [section, setSection] = useState<'enrolled' | 'favorites'>('enrolled');
+  const params = useLocalSearchParams<{ section?: string }>();
 
   useFocusEffect(
     useCallback(() => {
@@ -72,6 +87,11 @@ export default function MyWorkshopsScreen() {
       router.replace('/teacher/workshops');
     }
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    const value = Array.isArray(params.section) ? params.section[0] : params.section;
+    if (value === 'favorites') setSection('favorites');
+  }, [params.section]);
 
   const loadWorkshopsForEnrollments = useCallback(async (list: Enrollment[]) => {
     if (list.length === 0) {
@@ -134,25 +154,6 @@ export default function MyWorkshopsScreen() {
       cancelled = true;
     };
   }, [favoriteIds, user?.uid]);
-
-  const sections = useMemo((): SectionRow[] => {
-    const out: SectionRow[] = [];
-    if (favoriteWorkshops.length > 0) {
-      out.push({
-        title: 'Guardados',
-        kind: 'saved',
-        data: favoriteWorkshops,
-      });
-    }
-    if (enrollments.length > 0) {
-      out.push({
-        title: 'Mis inscripciones',
-        kind: 'enrolled',
-        data: enrollments,
-      });
-    }
-    return out;
-  }, [favoriteWorkshops, enrollments]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -222,116 +223,201 @@ export default function MyWorkshopsScreen() {
   }
 
   return (
-    <SectionList<Workshop | Enrollment, SectionRow>
-      sections={sections}
-      keyExtractor={(item) =>
-        isEnrollment(item) ? `e-${item.id}` : `s-${item.id}`
-      }
-      renderSectionHeader={({ section }) => (
-        <Text style={styles.sectionHeader}>{section.title}</Text>
-      )}
-      contentContainerStyle={
-        sections.length === 0 ? styles.listEmpty : styles.listContent
-      }
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => void onRefresh()}
-          tintColor={COLORS.primaryGreen}
-        />
-      }
-      ListEmptyComponent={
-        <View style={styles.inlineEmpty}>
-          <Text style={styles.inlineEmptyText}>
-            No tenés talleres guardados ni inscripciones aún.
+    <View style={styles.screen}>
+      <View style={styles.tabs}>
+        <Pressable
+          style={[styles.tab, section === 'enrolled' && styles.tabOn]}
+          onPress={() => setSection('enrolled')}
+        >
+          <Text style={[styles.tabText, section === 'enrolled' && styles.tabTextOn]}>
+            Inscriptos
           </Text>
-          <Pressable
-            style={({ pressed }) => [styles.linkBtn, pressed && styles.pressed]}
-            onPress={() => router.push('/workshops')}
-          >
-            <Text style={styles.linkBtnText}>Explorar talleres</Text>
-          </Pressable>
-        </View>
-      }
-      renderItem={({ item, section }) => {
-        if (section.kind === 'saved') {
-          const w = item as Workshop;
-          const coverUri = w.coverImageUrl;
-          return (
-            <Pressable
-              style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-              onPress={() => router.push(`/workshops/${w.id}`)}
-            >
-              <View style={styles.coverWrap}>
-                {coverUri ? (
-                  <Image source={{ uri: coverUri }} style={styles.cover} resizeMode="cover" />
-                ) : (
-                  <View style={styles.coverPlaceholder}>
-                    <Ionicons name="image-outline" size={28} color="#94a3b8" />
-                  </View>
-                )}
-              </View>
-              <View style={styles.cardBodyRow}>
-                <View style={styles.cardBody}>
-                  <Text style={styles.savedBadge}>Guardado</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tab, section === 'favorites' && styles.tabOn]}
+          onPress={() => setSection('favorites')}
+        >
+          <Text style={[styles.tabText, section === 'favorites' && styles.tabTextOn]}>
+            ★ Favoritos
+          </Text>
+        </Pressable>
+      </View>
+
+      {section === 'favorites' ? (
+        <FlatList
+          data={favoriteWorkshops}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={
+            favoriteWorkshops.length === 0 ? styles.listEmpty : styles.listContent
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void onRefresh()}
+              tintColor={COLORS.primaryGreen}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.inlineEmpty}>
+              <Text style={styles.inlineEmptyText}>
+                No tienes talleres guardados en favoritos.
+              </Text>
+              <Text style={styles.emptyHint}>Tocá la estrella en un taller para guardarlo.</Text>
+            </View>
+          }
+          renderItem={({ item, index }) => {
+            const uri = coverUri(item, index);
+            const reviews =
+              item.stats?.reviewsCount && item.stats.reviewsCount > 0
+                ? `★ ${item.stats.avgRating?.toFixed(1) ?? '–'} · ${item.stats.reviewsCount} reseñas`
+                : 'Sin reseñas';
+            return (
+              <Pressable
+                style={({ pressed }) => [styles.exploreCard, pressed && styles.cardPressed]}
+                onPress={() => router.push(`/workshops/${item.id}`)}
+              >
+                <View style={styles.exploreCover}>
+                  {uri ? (
+                    <Image source={{ uri }} style={styles.cover} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.coverPlaceholder}>
+                      <Ionicons name="image-outline" size={28} color="#94a3b8" />
+                    </View>
+                  )}
+                </View>
+                <View style={styles.exploreBody}>
                   <Text style={styles.cardTitle} numberOfLines={2}>
-                    {w.title}
+                    {item.title}
+                    {item.teacherName ? (
+                      <Text style={styles.teacherInline}> · {item.teacherName}</Text>
+                    ) : null}
                   </Text>
-                  {w.teacherName ? (
-                    <Text style={styles.cardSubtitle} numberOfLines={1}>
-                      {w.teacherName}
+                  {item.description?.trim() ? (
+                    <Text style={styles.cardDesc} numberOfLines={2}>
+                      {item.description.replace(/\s+/g, ' ').trim()}
                     </Text>
                   ) : null}
+                  <View style={styles.exploreFooter}>
+                    <Text style={styles.price}>{formatPrice(item)}</Text>
+                    <Text style={styles.meta}>{reviews}</Text>
+                  </View>
                 </View>
                 <Pressable
                   style={({ pressed }) => [styles.favStarAside, pressed && styles.favStarPressed]}
                   hitSlop={10}
-                  onPress={() => void handleUnsave(w.id)}
+                  onPress={() => void handleUnsave(item.id)}
                 >
                   <Ionicons name="star" size={22} color="#f59e0b" />
                 </Pressable>
-              </View>
-            </Pressable>
-          );
-        }
-
-        const enr = item as Enrollment;
-        const workshop = workshopsById[enr.workshopId];
-        const coverUri = workshop?.coverImageUrl;
-
-        return (
-          <Pressable
-            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-            onPress={() => router.push(`/workshops/${enr.workshopId}`)}
-          >
-            <View style={styles.coverWrap}>
-              {coverUri ? (
-                <Image source={{ uri: coverUri }} style={styles.cover} resizeMode="cover" />
-              ) : (
-                <View style={styles.coverPlaceholder}>
-                  <Ionicons name="image-outline" size={28} color="#94a3b8" />
+              </Pressable>
+            );
+          }}
+        />
+      ) : (
+        <FlatList
+          data={enrollments}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={enrollments.length === 0 ? styles.listEmpty : styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void onRefresh()}
+              tintColor={COLORS.primaryGreen}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.inlineEmpty}>
+              <Text style={styles.inlineEmptyText}>No tienes talleres inscritos aún.</Text>
+              <Pressable
+                style={({ pressed }) => [styles.linkBtn, pressed && styles.pressed]}
+                onPress={() => router.push('/workshops')}
+              >
+                <Text style={styles.linkBtnText}>Explorar talleres</Text>
+              </Pressable>
+            </View>
+          }
+          renderItem={({ item, index }) => {
+            const workshop = workshopsById[item.workshopId];
+            const uri = coverUri(workshop, index);
+            return (
+              <Pressable
+                style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+                onPress={() => router.push(`/workshops/${item.workshopId}`)}
+              >
+                <View style={styles.coverWrap}>
+                  {uri ? (
+                    <Image source={{ uri }} style={styles.cover} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.coverPlaceholder}>
+                      <Ionicons name="image-outline" size={28} color="#94a3b8" />
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-            <View style={styles.cardBody}>
-              <Text style={styles.cardTitle} numberOfLines={2}>
-                {workshop?.title ?? `Taller ${enr.workshopId}`}
-              </Text>
-              {workshop?.teacherName ? (
-                <Text style={styles.cardSubtitle} numberOfLines={1}>
-                  {workshop.teacherName}
-                </Text>
-              ) : null}
-              <Text style={styles.status}>{enrollmentStatusLabel(enr.status)}</Text>
-            </View>
-          </Pressable>
-        );
-      }}
-    />
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardTitle} numberOfLines={2}>
+                    {workshop?.title ?? `Taller ${item.workshopId}`}
+                  </Text>
+                  {workshop?.teacherName ? (
+                    <Text style={styles.cardSubtitle} numberOfLines={1}>
+                      {workshop.teacherName}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.status}>{enrollmentStatusLabel(item.status)}</Text>
+                </View>
+              </Pressable>
+            );
+          }}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: COLORS.background },
+  tabs: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  tab: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  tabOn: {
+    backgroundColor: COLORS.primaryGreen,
+    borderColor: COLORS.primaryGreen,
+  },
+  tabText: { fontWeight: '700', color: COLORS.textPrimary, fontSize: 14 },
+  tabTextOn: { color: '#fff' },
+  exploreCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  exploreCover: { width: 100, backgroundColor: '#e2e8f0' },
+  exploreBody: { flex: 1, padding: 12, justifyContent: 'center', minWidth: 0 },
+  exploreFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  teacherInline: { fontWeight: '500', color: COLORS.textSecondary },
+  cardDesc: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4 },
+  price: { fontSize: 15, fontWeight: '700', color: COLORS.brandForest },
+  meta: { fontSize: 12, color: COLORS.textSecondary, flexShrink: 1 },
+  emptyHint: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center' },
   centered: {
     flex: 1,
     justifyContent: 'center',

@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { listUserFavorites } from '@/services/favorites.service';
+import { listUserFavorites, removeFavorite } from '@/services/favorites.service';
 import { getWorkshopById } from '@/services/workshops.service';
-import { WorkshopCard } from './WorkshopList';
+import { ExploreWorkshopCard } from './ExploreWorkshopCard';
 import type { Workshop } from '@/types';
 
 export function FavoritesList() {
@@ -42,19 +42,28 @@ export function FavoritesList() {
 
   if (workshops.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+      <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
         <p>No tienes talleres guardados en favoritos.</p>
         <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
-          Haz clic en el corazón en cualquier taller para guardarlo.
+          Tocá la estrella en un taller para guardarlo.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="card-grid">
-      {workshops.map((workshop) => (
-        <WorkshopCard key={workshop.id} workshop={workshop} showFavorite />
+    <div className="explore-grid">
+      {workshops.map((workshop, index) => (
+        <ExploreWorkshopCard
+          key={workshop.id}
+          workshop={workshop}
+          index={index}
+          favorited
+          onToggleFavorite={() => {
+            void removeFavorite(user.uid, workshop.id);
+            setWorkshops((prev) => prev.filter((item) => item.id !== workshop.id));
+          }}
+        />
       ))}
     </div>
   );

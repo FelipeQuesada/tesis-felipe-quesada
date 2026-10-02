@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import {
+  Alert,
   Image,
   ImageBackground,
   Pressable,
@@ -12,6 +13,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useFavorites } from '../../src/hooks/useFavorites';
 import { usePublishedWorkshops } from '../../src/hooks/usePublishedWorkshops';
 import { usePublishedBlogPosts } from '../../src/hooks/useBlog';
 import { COLORS } from '../../src/constants/theme';
@@ -27,6 +29,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, loading } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites(user?.uid ?? null);
   const { workshops, loading: wLoading } = usePublishedWorkshops();
   const { posts, loading: bLoading } = usePublishedBlogPosts();
 
@@ -125,6 +128,33 @@ export default function HomeScreen() {
                   ) : (
                     <View style={[styles.cover, { backgroundColor: '#d9d3c9' }]} />
                   )}
+                  <Pressable
+                    style={styles.favBtn}
+                    hitSlop={8}
+                    onPress={() => {
+                      if (!user) {
+                        Alert.alert(
+                          'Guardar taller',
+                          'Iniciá sesión para guardar talleres y verlos en Mis talleres.',
+                          [
+                            { text: 'Cancelar', style: 'cancel' },
+                            {
+                              text: 'Ir a login',
+                              onPress: () => router.push('/auth/login' as Href),
+                            },
+                          ]
+                        );
+                        return;
+                      }
+                      void toggleFavorite(w.id);
+                    }}
+                  >
+                    <Ionicons
+                      name={isFavorite(w.id) ? 'star' : 'star-outline'}
+                      size={16}
+                      color={isFavorite(w.id) ? '#b45309' : COLORS.brandForest}
+                    />
+                  </Pressable>
                 </View>
                 <View style={styles.cardBody}>
                   <Text style={[styles.chip, { backgroundColor: chip.bg, color: chip.color }]}>
@@ -287,8 +317,19 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: 'hidden',
   },
-  coverWrap: { height: 120, backgroundColor: '#d9d3c9' },
+  coverWrap: { height: 120, backgroundColor: '#d9d3c9', position: 'relative' },
   cover: { width: '100%', height: '100%' },
+  favBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   cardBody: { padding: 10 },
   chip: {
     alignSelf: 'flex-start',

@@ -1,5 +1,5 @@
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage, auth } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase';
 import { optimizeImageIfNeeded } from '@/utils/image-compression';
 
 /**
@@ -16,12 +16,10 @@ export async function uploadProfileImage(
   userId: string,
   file: File
 ): Promise<string> {
-  if (!storage) {
-    throw new Error('Firebase Storage no está inicializado');
-  }
+  const storage = getFirebaseStorage();
+  const auth = getFirebaseAuth();
 
-  // Verificar que el usuario esté autenticado
-  if (!auth?.currentUser) {
+  if (!auth.currentUser) {
     throw new Error('Debes estar autenticado para subir imágenes');
   }
 

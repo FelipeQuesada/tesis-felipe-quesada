@@ -1,5 +1,5 @@
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 
 export type AdminAggregateStats = {
   users: number;
@@ -11,7 +11,7 @@ export type AdminAggregateStats = {
  * Conteos básicos para el panel admin (lecturas completas; válido para MVP).
  */
 export async function getAdminAggregateStats(): Promise<AdminAggregateStats> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
 
   const [usersSnap, workshopsSnap, enrollmentsSnap] = await Promise.all([
     getDocs(collection(db, 'users')),

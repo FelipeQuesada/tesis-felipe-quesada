@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,16 +9,21 @@ import { useStudentEnrollments } from '@/hooks/useEnrollments';
 import { getWorkshopById } from '@/services/workshops.service';
 import { PageHeader } from '@/components/PageHeader';
 import { BottomNav } from '@/components/BottomNav';
+import { FavoritesList } from '@/components/FavoritesList';
 import type { Workshop } from '@/types';
 
 export default function MyWorkshopsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { enrollments, loading: enrollmentsLoading } = useStudentEnrollments(
     user?.uid || null
   );
   const [workshops, setWorkshops] = useState<Record<string, Workshop>>({});
   const [loadingWorkshops, setLoadingWorkshops] = useState(true);
+  const [section, setSection] = useState<'enrolled' | 'favorites'>(
+    searchParams.get('section') === 'favorites' ? 'favorites' : 'enrolled'
+  );
 
   useEffect(() => {
     async function loadWorkshops() {
@@ -149,8 +154,26 @@ export default function MyWorkshopsPage() {
     <>
       <PageHeader title="Mis Talleres" />
       <main style={{ paddingBottom: '80px', padding: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <button
+            type="button"
+            className={`btn ${section === 'enrolled' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setSection('enrolled')}
+          >
+            Inscriptos
+          </button>
+          <button
+            type="button"
+            className={`btn ${section === 'favorites' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setSection('favorites')}
+          >
+            ★ Favoritos
+          </button>
+        </div>
 
-        {enrollments.length === 0 ? (
+        {section === 'favorites' ? (
+          <FavoritesList />
+        ) : enrollments.length === 0 ? (
           <div
             style={{
               textAlign: 'center',

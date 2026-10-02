@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import {
   getHardcodedPublishedBlogPostById,
   mergeFeaturedHardcodedWithRemote,
@@ -52,7 +52,7 @@ export async function createBlogPost(
   authorId: string,
   input: BlogPostCreateInput
 ): Promise<BlogPost> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   const now = serverTimestamp();
 
@@ -82,7 +82,7 @@ export async function updateBlogPost(
   blogId: string,
   input: Partial<BlogPostCreateInput>
 ): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, blogId);
   const now = serverTimestamp();
   const payload: Record<string, unknown> = {
@@ -99,7 +99,7 @@ export async function updateBlogPost(
  * Publishes a blog post
  */
 export async function publishBlogPost(blogId: string): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, blogId);
   await updateDoc(docRef, {
     status: 'published',
@@ -112,7 +112,7 @@ export async function publishBlogPost(blogId: string): Promise<void> {
  * Unpublishes a blog post
  */
 export async function unpublishBlogPost(blogId: string): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, blogId);
   await updateDoc(docRef, {
     status: 'draft',
@@ -124,7 +124,7 @@ export async function unpublishBlogPost(blogId: string): Promise<void> {
  * Deletes a blog post
  */
 export async function deleteBlogPost(blogId: string): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, blogId);
   await deleteDoc(docRef);
 }
@@ -133,7 +133,7 @@ export async function deleteBlogPost(blogId: string): Promise<void> {
  * Gets blog post by ID
  */
 export async function getBlogPostById(blogId: string): Promise<BlogPost | null> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, blogId);
   const docSnap = await getDoc(docRef);
 
@@ -163,7 +163,7 @@ export async function getPublishedBlogPostById(blogId: string): Promise<BlogPost
  * Gets blog post by slug
  */
 export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   const q = query(colRef, where('slug', '==', slug));
 
@@ -182,7 +182,7 @@ export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> 
  * Lists all published blog posts
  */
 export async function listPublishedBlogPosts(): Promise<BlogPost[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   // Sin orderBy compuesto: evita índice `status + publishedAt` y ordena en cliente
   const q = query(colRef, where('status', '==', 'published'));
@@ -202,7 +202,7 @@ export async function listPublishedBlogPosts(): Promise<BlogPost[]> {
  * Lists all blog posts (for admin)
  */
 export async function listAllBlogPosts(): Promise<BlogPost[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   const q = query(colRef, orderBy('createdAt', 'desc'));
 
@@ -216,7 +216,7 @@ export async function listAllBlogPosts(): Promise<BlogPost[]> {
 export async function listBlogPostsByCategories(
   categoryIds: string[]
 ): Promise<BlogPost[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   if (categoryIds.length === 0) return [];
 
   const colRef = collection(db, COLLECTION);

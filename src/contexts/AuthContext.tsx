@@ -11,7 +11,7 @@ import {
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { auth, ensureFirebaseClient } from '@/lib/firebase';
+import { getFirebaseAuth } from '@/lib/firebase';
 import { getUserDoc, upsertUserDoc } from '@/services/user.service';
 import type { User, UserRegistrationProfile, UserRole } from '@/types';
 
@@ -39,9 +39,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    ensureFirebaseClient();
-    // Only run on client side
-    if (typeof window === 'undefined' || !auth) {
+    if (typeof window === 'undefined') {
+      setLoading(false);
+      return;
+    }
+
+    let auth;
+    try {
+      auth = getFirebaseAuth();
+    } catch {
       setLoading(false);
       return;
     }
@@ -90,9 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    ensureFirebaseClient();
-    if (!auth) throw new Error('Firebase Auth no está inicializado');
-    await signInWithEmailAndPassword(auth, email, password);
+    await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
   };
 
   const signUp = async (
@@ -101,11 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     role: UserRole,
     profile: UserRegistrationProfile
   ) => {
-    ensureFirebaseClient();
-    if (!auth) throw new Error('Firebase Auth no está inicializado');
     console.log('AuthContext - Registrando usuario con rol:', role);
     const userCredential = await createUserWithEmailAndPassword(
-      auth,
+      getFirebaseAuth(),
       email,
       password
     );
@@ -129,23 +131,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    ensureFirebaseClient();
-    if (!auth) throw new Error('Firebase Auth no está inicializado');
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    await signInWithPopup(getFirebaseAuth(), provider);
     // User document creation is handled in onAuthStateChanged
   };
 
   const signOut = async () => {
-    ensureFirebaseClient();
-    if (!auth) throw new Error('Firebase Auth no está inicializado');
-    await firebaseSignOut(auth);
+    await firebaseSignOut(getFirebaseAuth());
   };
 
   const sendPasswordReset = async (email: string) => {
-    ensureFirebaseClient();
-    if (!auth) throw new Error('Firebase Auth no está inicializado');
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(getFirebaseAuth(), email);
   };
 
   return (

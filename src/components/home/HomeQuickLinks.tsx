@@ -26,7 +26,7 @@ const LINKS = [
     ),
   },
   {
-    href: '/dashboard/my-workshops',
+    href: '/dashboard/my-workshops?section=favorites',
     label: 'Favoritos',
     blob: 'peach',
     icon: (

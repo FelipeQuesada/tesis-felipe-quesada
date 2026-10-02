@@ -29,7 +29,7 @@ function FavoriteButton({
       }}
       aria-label={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
     >
-      {isFavorite ? '❤️' : '🤍'}
+      {isFavorite ? '★' : '☆'}
     </button>
   );
 }

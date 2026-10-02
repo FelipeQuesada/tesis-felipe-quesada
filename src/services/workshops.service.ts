@@ -14,7 +14,7 @@ import {
   Timestamp,
   GeoPoint,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import type {
   Workshop,
   WorkshopCreateInput,
@@ -112,7 +112,7 @@ export async function createWorkshop(
   input: WorkshopCreateInput,
   teacherName?: string
 ): Promise<Workshop> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   const now = serverTimestamp();
 
@@ -154,7 +154,7 @@ export async function createWorkshop(
  * Publishes a workshop (changes status to published and sets publishedAt)
  */
 export async function publishWorkshop(workshopId: string): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, workshopId);
   await updateDoc(docRef, {
     status: 'published',
@@ -167,7 +167,7 @@ export async function publishWorkshop(workshopId: string): Promise<void> {
  * Unpublishes a workshop (changes status to draft)
  */
 export async function unpublishWorkshop(workshopId: string): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, workshopId);
   await updateDoc(docRef, {
     status: 'draft',
@@ -234,7 +234,7 @@ export async function searchWorkshops(
  * Lists all published workshops
  */
 export async function listPublishedWorkshops(): Promise<Workshop[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   // Solo usar where para evitar necesidad de índice compuesto
   // Ordenaremos en el cliente
@@ -282,7 +282,7 @@ export async function listPublishedWorkshopsByTeacherId(
  * Lista talleres para administración (requiere rol admin en reglas).
  */
 export async function listAllWorkshopsAdmin(maxResults = 100): Promise<Workshop[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   const q = query(colRef, orderBy('createdAt', 'desc'), limit(maxResults));
   const querySnapshot = await getDocs(q);
@@ -295,7 +295,7 @@ export async function listAllWorkshopsAdmin(maxResults = 100): Promise<Workshop[
 export async function listTeacherWorkshops(
   teacherId: string
 ): Promise<Workshop[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   // Evita índice compuesto (`teacherId + createdAt`) y ordena en cliente.
   const q = query(colRef, where('teacherId', '==', teacherId));
@@ -310,7 +310,7 @@ export async function listTeacherWorkshops(
  * Gets workshop by ID
  */
 export async function getWorkshopById(workshopId: string): Promise<Workshop | null> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, workshopId);
   const docSnap = await getDoc(docRef);
 
@@ -328,7 +328,7 @@ export async function updateWorkshop(
   workshopId: string,
   input: Partial<WorkshopCreateInput>
 ): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, workshopId);
   
   // Si se actualiza la ubicación y no tiene coordenadas, geocodificar
@@ -357,7 +357,7 @@ export async function updateWorkshop(
  * Deletes a workshop (teacher can delete only their own, admin can delete any)
  */
 export async function deleteWorkshop(workshopId: string): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, workshopId);
   await deleteDoc(docRef);
 }

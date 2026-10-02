@@ -10,7 +10,7 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import type { BlogComment } from '@/types';
 
 const LIKES_COLLECTION = 'blogLikes';
@@ -38,7 +38,7 @@ function docToComment(docId: string, data: Record<string, unknown>): BlogComment
 }
 
 export async function getBlogLikesCount(blogId: string): Promise<number> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, LIKES_COLLECTION);
   const q = query(colRef, where('blogId', '==', blogId));
   const snap = await getDocs(q);
@@ -49,7 +49,7 @@ export async function isBlogLikedByUser(
   blogId: string,
   userId: string
 ): Promise<boolean> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, LIKES_COLLECTION);
   const q = query(
     colRef,
@@ -64,7 +64,7 @@ export async function toggleBlogLike(
   blogId: string,
   userId: string
 ): Promise<boolean> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, LIKES_COLLECTION);
   const existing = await getDocs(
     query(colRef, where('blogId', '==', blogId), where('userId', '==', userId))
@@ -83,7 +83,7 @@ export async function toggleBlogLike(
 }
 
 export async function listBlogComments(blogId: string): Promise<BlogComment[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COMMENTS_COLLECTION);
   const q = query(colRef, where('blogId', '==', blogId));
   const snap = await getDocs(q);
@@ -98,7 +98,7 @@ export async function addBlogComment(input: {
   userDisplayName: string;
   text: string;
 }): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const cleanedText = input.text.trim();
   if (cleanedText.length < 2) {
     throw new Error('El comentario es demasiado corto.');

@@ -7,7 +7,7 @@ import {
   where,
   orderBy,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 
 export interface Country {
   id: string;
@@ -29,7 +29,7 @@ const CITIES_COLLECTION = 'cities';
  * Obtiene todos los países ordenados por nombre
  */
 export async function getCountries(): Promise<Country[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COUNTRIES_COLLECTION);
   const q = query(colRef, orderBy('name', 'asc'));
   const querySnapshot = await getDocs(q);
@@ -45,7 +45,7 @@ export async function getCountries(): Promise<Country[]> {
  * Obtiene todas las ciudades de un país específico
  */
 export async function getCitiesByCountry(countryId: string): Promise<City[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, CITIES_COLLECTION);
   
   console.log('🔍 Buscando ciudades con countryId:', countryId);
@@ -139,7 +139,7 @@ export async function getCitiesByCountry(countryId: string): Promise<City[]> {
  * Busca ciudades por nombre (con filtro opcional de país)
  */
 export async function searchCities(searchQuery: string, countryId?: string): Promise<City[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, CITIES_COLLECTION);
   
   // Firestore no soporta búsqueda de texto completo, así que traemos todas y filtramos en el cliente
@@ -187,7 +187,7 @@ export async function searchCities(searchQuery: string, countryId?: string): Pro
  * Obtiene un país por su código
  */
 export async function getCountryByCode(code: string): Promise<Country | null> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COUNTRIES_COLLECTION);
   const q = query(colRef, where('code', '==', code));
   const querySnapshot = await getDocs(q);
@@ -206,7 +206,7 @@ export async function getCountryByCode(code: string): Promise<Country | null> {
  * Obtiene una ciudad por su ID
  */
 export async function getCityById(cityId: string): Promise<City | null> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, CITIES_COLLECTION, cityId);
   const docSnap = await getDoc(docRef);
   

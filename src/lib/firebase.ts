@@ -1,45 +1,45 @@
 'use client';
 
 /**
- * Firebase client SDK — solo navegador.
- * Usar `ensureFirebaseClient()` desde `FirebaseClientRoot` antes del resto de la app.
+ * Una sola conexión de Firebase en el navegador.
+ * Auth, Firestore y Storage salen siempre de esta app, nunca de una instancia vieja.
  */
 
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
-import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { validateEnvVars, getFirebaseClientConfig } from './env';
+
+const APP_NAME = 'mitaller';
 
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let db: Firestore | undefined;
 let storage: FirebaseStorage | undefined;
-
 let clientReady = false;
 let initError: string | null = null;
-/** Evita inundar la consola si algo falla en bucle (p. ej. muchos re-renders). */
 let initErrorLogged = false;
 
-/**
- * Idempotente. Ejecutar en el cliente antes de usar auth/db/storage.
- * Tras un fallo se puede volver a llamar (p. ej. login) y se reintenta; no hay bloqueo permanente.
- */
 export function ensureFirebaseClient(): void {
   if (typeof window === 'undefined') {
     return;
   }
-  if (clientReady) {
+  if (clientReady && app && auth && db && storage) {
     return;
   }
 
   try {
     validateEnvVars();
+    const config = getFirebaseClientConfig();
+    const current = getApps().find((item) => item.name === APP_NAME);
 
-    if (getApps().length === 0) {
-      app = initializeApp(getFirebaseClientConfig());
+    if (current && current.options.apiKey === config.apiKey) {
+      app = current;
+    } else if (!current) {
+      app = initializeApp(config, APP_NAME);
     } else {
-      app = getApps()[0];
+      app = initializeApp(config, `${APP_NAME}-actual`);
     }
 
     auth = getAuth(app);
@@ -49,6 +49,7 @@ export function ensureFirebaseClient(): void {
     initError = null;
     initErrorLogged = false;
   } catch (error) {
+    clientReady = false;
     initError =
       error instanceof Error
         ? error.message
@@ -56,11 +57,32 @@ export function ensureFirebaseClient(): void {
     if (!initErrorLogged) {
       initErrorLogged = true;
       console.error('Error inicializando Firebase:', error);
-      if (error instanceof Error) {
-        console.error('Mensaje de error:', error.message);
-      }
     }
   }
+}
+
+export function getFirebaseAuth(): Auth {
+  ensureFirebaseClient();
+  if (!auth) {
+    throw new Error(initError || 'Firebase Auth no está inicializado');
+  }
+  return auth;
+}
+
+export function getDb(): Firestore {
+  ensureFirebaseClient();
+  if (!db) {
+    throw new Error(initError || 'Firestore no está inicializado');
+  }
+  return db;
+}
+
+export function getFirebaseStorage(): FirebaseStorage {
+  ensureFirebaseClient();
+  if (!storage) {
+    throw new Error(initError || 'Firebase Storage no está inicializado');
+  }
+  return storage;
 }
 
 export function isFirebaseClientReady(): boolean {
@@ -70,5 +92,3 @@ export function isFirebaseClientReady(): boolean {
 export function getFirebaseInitError(): string | null {
   return initError;
 }
-
-export { app, auth, db, storage };

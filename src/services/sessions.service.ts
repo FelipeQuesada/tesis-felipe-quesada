@@ -8,7 +8,7 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import type { Session, SessionCreateInput } from '@/types';
 
 const COLLECTION = 'sessions';
@@ -39,7 +39,7 @@ function docToSession(docId: string, data: any): Session {
 export async function createSession(
   input: SessionCreateInput
 ): Promise<Session> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
 
   const docData = {
@@ -61,7 +61,7 @@ export async function createSession(
 export async function listSessionsByWorkshop(
   workshopId: string
 ): Promise<Session[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   // Evita índice compuesto (`workshopId + startAt`) y ordena en cliente.
   const q = query(colRef, where('workshopId', '==', workshopId));
@@ -76,7 +76,7 @@ export async function listSessionsByWorkshop(
  * Gets session by ID
  */
 export async function getSessionById(sessionId: string) {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, sessionId);
   const docSnap = await getDoc(docRef);
   if (!docSnap.exists()) return null;

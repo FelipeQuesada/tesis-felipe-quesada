@@ -6,17 +6,28 @@
  * permisos de escritura en Firestore.
  */
 
+import { config as loadEnv } from 'dotenv';
+import { resolve } from 'path';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
-// Configuración de Firebase (usa las mismas variables de entorno)
+loadEnv({ path: resolve(process.cwd(), '.env.local') });
+
+function required(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Falta ${name} en .env.local`);
+  }
+  return value;
+}
+
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyB7wIdK2_jWHGO8jxqZ1dKU_PWcLC_ej-E',
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'mitaller-app.firebaseapp.com',
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'mitaller-app',
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'mitaller-app.firebasestorage.app',
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '109270054352',
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:109270054352:web:0e6c1bc8e2b537c41135d5',
+  apiKey: required('NEXT_PUBLIC_FIREBASE_API_KEY'),
+  authDomain: required('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN'),
+  projectId: required('NEXT_PUBLIC_FIREBASE_PROJECT_ID'),
+  storageBucket: required('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: required('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: required('NEXT_PUBLIC_FIREBASE_APP_ID'),
 };
 
 // Países principales (empezamos con Argentina)

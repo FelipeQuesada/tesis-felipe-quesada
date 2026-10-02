@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import type { Enrollment, EnrollmentCreateInput } from '@/types';
 import { getSessionById } from './sessions.service';
 
@@ -65,7 +65,7 @@ async function hasDuplicateEnrollment(
 export async function createEnrollment(
   input: EnrollmentCreateInput
 ): Promise<Enrollment> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
 
   const session = await getSessionById(input.sessionId);
   if (!session) throw new Error('Sesión no encontrada');
@@ -102,7 +102,7 @@ export async function cancelEnrollment(
   enrollmentId: string,
   studentId: string
 ): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, enrollmentId);
   const docSnap = await getDoc(docRef);
   if (!docSnap.exists()) throw new Error('Inscripción no encontrada');
@@ -131,7 +131,7 @@ export async function updateEnrollmentSession(
   studentId: string,
   newSessionId: string
 ): Promise<void> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const docRef = doc(db, COLLECTION, enrollmentId);
   const docSnap = await getDoc(docRef);
   if (!docSnap.exists()) throw new Error('Inscripción no encontrada');
@@ -164,7 +164,7 @@ export async function updateEnrollmentSession(
 export async function listStudentEnrollments(
   studentId: string
 ): Promise<Enrollment[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   // Evita índice compuesto (`studentId + createdAt`) y ordena en cliente.
   const q = query(colRef, where('studentId', '==', studentId));
@@ -182,7 +182,7 @@ export async function listTeacherEnrollmentsByWorkshop(
   teacherId: string,
   workshopId?: string
 ): Promise<Enrollment[]> {
-  if (!db) throw new Error('Firestore no está inicializado');
+  const db = getDb();
   const colRef = collection(db, COLLECTION);
   let q = query(colRef, where('teacherId', '==', teacherId));
 

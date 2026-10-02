@@ -52,7 +52,7 @@ const BLOB_PATHS: Record<
 const LINKS = [
   { href: '/workshops', label: 'Explorar talleres', blob: 'mint' as const, icon: 'search-outline' as const },
   { href: '/my-workshops', label: 'Mis talleres', blob: 'sand' as const, icon: 'calendar-outline' as const },
-  { href: '/my-workshops', label: 'Favoritos', blob: 'peach' as const, icon: 'heart-outline' as const },
+  { href: '/my-workshops?section=favorites', label: 'Favoritos', blob: 'peach' as const, icon: 'star-outline' as const },
   { href: '/blog', label: 'Blog', blob: 'lilac' as const, icon: 'book-outline' as const },
 ];
 
@@ -65,7 +65,7 @@ function QuickTile({
   href: string;
   label: string;
   blob: BlobKey;
-  icon: 'search-outline' | 'calendar-outline' | 'heart-outline' | 'book-outline';
+  icon: 'search-outline' | 'calendar-outline' | 'star-outline' | 'book-outline';
 }) {
   const router = useRouter();
   const [size, setSize] = useState({ w: 0, h: 0 });
