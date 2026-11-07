@@ -14,7 +14,11 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
-import { auth, ensureFirebaseClient } from '../lib/firebase';
+import { auth, ensureFirebaseClient, warmUpFirestoreConnection } from '../lib/firebase';
+import {
+  isTransientFirestoreError,
+  runWithFirestoreRetry,
+} from '../lib/firestoreRetry';
 import { getUserDoc, upsertUserDoc } from '../services/user.service';
 import type { User, UserRegistrationProfile, UserRole } from '../types';
 
@@ -62,17 +66,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        let userDoc = await getUserDoc(fbUser.uid);
+        await warmUpFirestoreConnection();
+        let userDoc = await runWithFirestoreRetry(() => getUserDoc(fbUser.uid), {
+          maxAttempts: 4,
+          baseDelayMs: 1200,
+          maxDelayMs: 5000,
+        });
         if (!userDoc) {
           const providers = fbUser.providerData.map((p) => p.providerId);
           const isGoogle = providers.includes('google.com');
           if (isGoogle) {
-            userDoc = await upsertUserDoc(fbUser.uid, {
-              email: fbUser.email || '',
-              displayName: fbUser.displayName,
-              photoURL: fbUser.photoURL,
-              role: 'student',
-            });
+            userDoc = await runWithFirestoreRetry(() =>
+              upsertUserDoc(fbUser.uid, {
+                email: fbUser.email || '',
+                displayName: fbUser.displayName,
+                photoURL: fbUser.photoURL,
+                role: 'student',
+              })
+            );
           } else {
             console.warn(
               'Usuario autenticado sin documento en Firestore (email/password).'
@@ -84,7 +95,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setUser(userDoc);
       } catch (e) {
-        console.error('AuthContext – error cargando perfil:', e);
+        // Target ID / assertion: ruido típico de Expo Go; no tumbar sesión.
+        if (isTransientFirestoreError(e)) {
+          console.warn('AuthContext – reintento de perfil falló (transitorio):', e);
+        } else {
+          console.warn('AuthContext – error cargando perfil:', e);
+        }
         setUser(null);
       } finally {
         setLoading(false);
@@ -155,10 +171,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ensureFirebaseClient();
     if (!auth?.currentUser) return;
     try {
-      const next = await getUserDoc(auth.currentUser.uid);
+      const next = await runWithFirestoreRetry(
+        () => getUserDoc(auth.currentUser!.uid),
+        { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 4000 }
+      );
       setUser(next);
     } catch (e) {
-      console.error('AuthContext refreshUser:', e);
+      console.warn('AuthContext refreshUser:', e);
     }
   }, []);
 

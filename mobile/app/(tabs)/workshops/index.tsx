@@ -15,11 +15,16 @@ import {
 import type { Href } from 'expo-router';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePublishedWorkshops } from '../../../src/hooks/usePublishedWorkshops';
 import { useAuth } from '../../../src/hooks/useAuth';
 import { useFavorites } from '../../../src/hooks/useFavorites';
 import { COLORS } from '../../../src/constants/theme';
+import { FLOATING_TAB_BAR_SPACE } from '../../../src/components/navigation/FloatingTabBar';
 import { getCategories } from '../../../src/services/category.service';
+import { getCategoryChipStyle } from '../../../src/lib/categoryColors';
+import { stockCoverByCategory, stockCoverByIndex } from '../../../src/lib/stockImages';
+import { resolvePublicAssetUri } from '../../../src/lib/siteAssets';
 import type { Category, DifficultyLevel, Workshop } from '../../../src/types';
 
 const COUNTRY_OPTIONS = [
@@ -35,8 +40,6 @@ const DIFFICULTY_CHIPS: { label: string; value: DifficultyLevel | '' }[] = [
   { label: 'Intermedio', value: 'intermediate' },
   { label: 'Avanzado', value: 'advanced' },
 ];
-
-const COLLAPSED_CATEGORY_COUNT = 6;
 
 function formatPrice(w: Workshop): string {
   try {
@@ -54,8 +57,24 @@ function descriptionPreview(desc: string): string {
   return desc.replace(/\s+/g, ' ').trim();
 }
 
+function categoryImageUri(
+  categoryName: string,
+  workshops: Workshop[],
+  index: number
+): string | null {
+  const fromWorkshop = workshops.find(
+    (w) => w.categoryId === categoryName && w.coverImageUrl
+  )?.coverImageUrl;
+  if (fromWorkshop) return fromWorkshop;
+
+  const stock =
+    stockCoverByCategory(categoryName) ?? stockCoverByIndex(index);
+  return resolvePublicAssetUri(stock);
+}
+
 export default function WorkshopsListScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { workshops, loading, error, refetch } = usePublishedWorkshops();
   const { isFavorite, toggleFavorite, refreshFavorites } = useFavorites(
@@ -68,14 +87,13 @@ export default function WorkshopsListScreen() {
     }, [refreshFavorites])
   );
 
-  const params = useLocalSearchParams<{ q?: string }>();
+  const params = useLocalSearchParams<{ q?: string; category?: string }>();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Todos');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [catalogCategories, setCatalogCategories] = useState<Category[]>([]);
   const [selectedCountryCode, setSelectedCountryCode] = useState<string>('AR');
   const [locationQuery, setLocationQuery] = useState('');
-  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel | ''>('');
@@ -84,9 +102,24 @@ export default function WorkshopsListScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const q = typeof params.q === 'string' ? params.q : Array.isArray(params.q) ? params.q[0] : '';
+    const q =
+      typeof params.q === 'string'
+        ? params.q
+        : Array.isArray(params.q)
+          ? params.q[0]
+          : '';
     if (q) setSearchQuery(q);
   }, [params.q]);
+
+  useEffect(() => {
+    const cat =
+      typeof params.category === 'string'
+        ? params.category
+        : Array.isArray(params.category)
+          ? params.category[0]
+          : '';
+    if (cat) setSelectedCategories([cat]);
+  }, [params.category]);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,18 +138,13 @@ export default function WorkshopsListScreen() {
     };
   }, []);
 
-  const categoryButtons = useMemo(() => {
+  const categories = useMemo(() => {
     const fromCatalog = catalogCategories.map((c) => c.name).filter(Boolean);
     const fromWorkshops = workshops.map((w) => w.categoryId).filter(Boolean);
-    const unique = Array.from(new Set([...fromCatalog, ...fromWorkshops])).sort((a, b) =>
+    return Array.from(new Set([...fromCatalog, ...fromWorkshops])).sort((a, b) =>
       a.localeCompare(b, 'es')
     );
-    return ['Todos', ...unique];
   }, [catalogCategories, workshops]);
-
-  const visibleCategories = categoriesExpanded
-    ? categoryButtons
-    : categoryButtons.slice(0, COLLAPSED_CATEGORY_COUNT);
 
   const filtered = useMemo(() => {
     let list = workshops;
@@ -125,17 +153,22 @@ export default function WorkshopsListScreen() {
     if (q) {
       list = list.filter(
         (w) =>
-          w.title.toLowerCase().includes(q) || w.description.toLowerCase().includes(q)
+          w.title.toLowerCase().includes(q) ||
+          w.description.toLowerCase().includes(q) ||
+          w.categoryId.toLowerCase().includes(q)
       );
     }
 
-    if (selectedCategory !== 'Todos') {
-      list = list.filter((w) => w.categoryId === selectedCategory);
+    if (selectedCategories.length > 0) {
+      const selected = new Set(selectedCategories);
+      list = list.filter((w) => selected.has(w.categoryId));
     }
 
     if (selectedCountryCode) {
       const code = selectedCountryCode.toUpperCase();
-      list = list.filter((w) => (w.location?.countryId || '').toUpperCase() === code);
+      list = list.filter(
+        (w) => (w.location?.countryId || '').toUpperCase() === code
+      );
     }
 
     const loc = locationQuery.trim().toLowerCase();
@@ -173,7 +206,7 @@ export default function WorkshopsListScreen() {
   }, [
     workshops,
     searchQuery,
-    selectedCategory,
+    selectedCategories,
     selectedCountryCode,
     locationQuery,
     priceMin,
@@ -182,6 +215,42 @@ export default function WorkshopsListScreen() {
     language,
     minRating,
   ]);
+
+  const featured = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const ratingDiff = (b.stats?.avgRating ?? 0) - (a.stats?.avgRating ?? 0);
+      if (ratingDiff !== 0) return ratingDiff;
+      return (b.stats?.enrolledCount ?? 0) - (a.stats?.enrolledCount ?? 0);
+    });
+  }, [filtered]);
+
+  const isBrowseMode =
+    !searchQuery.trim() &&
+    selectedCategories.length === 0 &&
+    !locationQuery.trim() &&
+    !priceMin.trim() &&
+    !priceMax.trim() &&
+    !difficultyLevel &&
+    !language.trim() &&
+    !minRating.trim();
+
+  const listTitle = isBrowseMode
+    ? 'Talleres destacados'
+    : selectedCategories.length === 1
+      ? selectedCategories[0]
+      : selectedCategories.length > 1
+        ? `${selectedCategories.length} categorías`
+        : 'Resultados';
+
+  const activeFilterCount = [
+    selectedCountryCode !== 'AR',
+    !!locationQuery.trim(),
+    !!priceMin.trim(),
+    !!priceMax.trim(),
+    !!difficultyLevel,
+    !!language.trim(),
+    !!minRating.trim(),
+  ].filter(Boolean).length;
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -214,6 +283,12 @@ export default function WorkshopsListScreen() {
     [user, toggleFavorite, router]
   );
 
+  const toggleCategory = (name: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
+    );
+  };
+
   const renderItem = ({ item }: { item: Workshop }) => (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
@@ -237,7 +312,10 @@ export default function WorkshopsListScreen() {
           <Text style={styles.titleLine} numberOfLines={2}>
             <Text style={styles.cardTitle}>{item.title}</Text>
             {item.teacherName ? (
-              <Text style={styles.teacherInline}>{' · '}{item.teacherName}</Text>
+              <Text style={styles.teacherInline}>
+                {' · '}
+                {item.teacherName}
+              </Text>
             ) : null}
           </Text>
           {item.description?.trim() ? (
@@ -274,35 +352,14 @@ export default function WorkshopsListScreen() {
 
   const listHeader = (
     <View style={styles.headerBlock}>
-      <Text style={styles.filterLabel}>País</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
-        keyboardShouldPersistTaps="handled"
-      >
-        {COUNTRY_OPTIONS.map((c) => {
-          const selected = selectedCountryCode === c.code;
-          return (
-            <Pressable
-              key={c.code}
-              style={[styles.chip, selected && styles.chipSelected]}
-              onPress={() => setSelectedCountryCode(c.code)}
-            >
-              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                {c.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <Text style={styles.pageTitle}>Buscar</Text>
 
       <View style={styles.searchWrap}>
-        <Ionicons name="search-outline" size={20} color="#64748b" />
+        <Ionicons name="search-outline" size={20} color="#8a918c" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar por título o descripción…"
-          placeholderTextColor="#94a3b8"
+          placeholder="Cerámica, pintura, yoga…"
+          placeholderTextColor="#9aa39c"
           value={searchQuery}
           onChangeText={setSearchQuery}
           autoCapitalize="none"
@@ -310,68 +367,91 @@ export default function WorkshopsListScreen() {
         />
         {searchQuery.length > 0 ? (
           <Pressable onPress={() => setSearchQuery('')} hitSlop={12}>
-            <Ionicons name="close-circle" size={20} color="#94a3b8" />
+            <Ionicons name="close-circle" size={20} color="#9aa39c" />
           </Pressable>
         ) : null}
       </View>
 
-      <Text style={styles.filterLabel}>Categoría</Text>
-      <View style={styles.categoryChipsWrap}>
-        {visibleCategories.map((cat) => {
-          const selected = selectedCategory === cat;
-          return (
-            <Pressable
-              key={cat}
-              style={[styles.chip, selected && styles.chipSelected]}
-              onPress={() => setSelectedCategory(cat)}
-            >
-              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{cat}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      {categoryButtons.length > COLLAPSED_CATEGORY_COUNT ? (
+      <View style={styles.filterBar}>
         <Pressable
-          style={styles.expandBtn}
-          onPress={() => setCategoriesExpanded((e) => !e)}
+          style={[styles.filterToggle, showFilters && styles.filterToggleOn]}
+          onPress={() => setShowFilters((s) => !s)}
         >
-          <Text style={styles.expandBtnText}>
-            {categoriesExpanded ? 'Ver menos' : 'Ver más categorías'}
+          <Ionicons
+            name="options-outline"
+            size={18}
+            color={COLORS.primaryGreenDark}
+          />
+          <Text style={styles.filterToggleText}>
+            Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </Text>
+          <Ionicons
+            name={showFilters ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={COLORS.primaryGreenDark}
+          />
         </Pressable>
-      ) : null}
+        {selectedCategories.length > 0 ? (
+          <Pressable
+            style={styles.clearCategory}
+            onPress={() => setSelectedCategories([])}
+          >
+            <Text style={styles.clearCategoryText}>
+              {selectedCategories.length === 1
+                ? selectedCategories[0]
+                : `${selectedCategories.length} categorías`}
+            </Text>
+            <Ionicons name="close" size={14} color={COLORS.primaryGreenDark} />
+          </Pressable>
+        ) : null}
+      </View>
 
-      <Text style={styles.filterLabel}>Ubicación</Text>
-      <TextInput
-        style={styles.locationInput}
-        placeholder="Ciudad o dirección (coincidencia parcial)…"
-        placeholderTextColor="#94a3b8"
-        value={locationQuery}
-        onChangeText={setLocationQuery}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
+      {showFilters ? (
+        <View style={styles.filtersPanel}>
+          <Text style={styles.filterLabel}>País</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+            keyboardShouldPersistTaps="handled"
+          >
+            {COUNTRY_OPTIONS.map((c) => {
+              const selected = selectedCountryCode === c.code;
+              return (
+                <Pressable
+                  key={c.code}
+                  style={[styles.chip, selected && styles.chipSelected]}
+                  onPress={() => setSelectedCountryCode(c.code)}
+                >
+                  <Text
+                    style={[styles.chipText, selected && styles.chipTextSelected]}
+                  >
+                    {c.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
 
-      <Pressable
-        style={styles.advancedToggle}
-        onPress={() => setShowAdvanced((s) => !s)}
-      >
-        <Ionicons
-          name={showAdvanced ? 'chevron-up' : 'chevron-down'}
-          size={20}
-          color={COLORS.primaryGreenDark}
-        />
-        <Text style={styles.advancedToggleText}>Más filtros</Text>
-      </Pressable>
+          <Text style={styles.filterLabel}>Ubicación</Text>
+          <TextInput
+            style={styles.fieldInput}
+            placeholder="Ciudad o dirección…"
+            placeholderTextColor="#9aa39c"
+            value={locationQuery}
+            onChangeText={setLocationQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
 
-      {showAdvanced ? (
-        <View style={styles.advancedPanel}>
-          <Text style={styles.advancedHint}>Precio ({workshops[0]?.currency ?? 'ARS'})</Text>
+          <Text style={styles.filterLabel}>
+            Precio ({workshops[0]?.currency ?? 'ARS'})
+          </Text>
           <View style={styles.rowInputs}>
             <TextInput
               style={styles.smallInput}
               placeholder="Mín."
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor="#9aa39c"
               value={priceMin}
               onChangeText={setPriceMin}
               keyboardType="decimal-pad"
@@ -379,14 +459,14 @@ export default function WorkshopsListScreen() {
             <TextInput
               style={styles.smallInput}
               placeholder="Máx."
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor="#9aa39c"
               value={priceMax}
               onChangeText={setPriceMax}
               keyboardType="decimal-pad"
             />
           </View>
 
-          <Text style={styles.advancedHint}>Dificultad</Text>
+          <Text style={styles.filterLabel}>Dificultad</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -400,7 +480,9 @@ export default function WorkshopsListScreen() {
                   style={[styles.chip, selected && styles.chipSelected]}
                   onPress={() => setDifficultyLevel(d.value)}
                 >
-                  <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                  <Text
+                    style={[styles.chipText, selected && styles.chipTextSelected]}
+                  >
                     {d.label}
                   </Text>
                 </Pressable>
@@ -408,21 +490,21 @@ export default function WorkshopsListScreen() {
             })}
           </ScrollView>
 
-          <Text style={styles.advancedHint}>Idioma</Text>
+          <Text style={styles.filterLabel}>Idioma</Text>
           <TextInput
-            style={styles.locationInput}
+            style={styles.fieldInput}
             placeholder="Ej. español, inglés…"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor="#9aa39c"
             value={language}
             onChangeText={setLanguage}
             autoCapitalize="none"
           />
 
-          <Text style={styles.advancedHint}>Rating mínimo</Text>
+          <Text style={styles.filterLabel}>Rating mínimo</Text>
           <TextInput
-            style={styles.locationInput}
+            style={styles.fieldInput}
             placeholder="Ej. 4"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor="#9aa39c"
             value={minRating}
             onChangeText={setMinRating}
             keyboardType="decimal-pad"
@@ -430,13 +512,50 @@ export default function WorkshopsListScreen() {
         </View>
       ) : null}
 
-      <View style={styles.headerDivider} />
+      {categories.length > 0 ? (
+        <>
+          <Text style={styles.sectionTitle}>Explorar</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.browseRow}
+          >
+            {categories.map((cat, index) => {
+              const uri = categoryImageUri(cat, workshops, index);
+              const chip = getCategoryChipStyle(cat);
+              const selected = selectedCategories.includes(cat);
+              return (
+                <Pressable
+                  key={`browse-${cat}`}
+                  style={[styles.browseCard, selected && styles.browseCardSelected]}
+                  onPress={() => toggleCategory(cat)}
+                >
+                  {uri ? (
+                    <Image source={{ uri }} style={styles.browseImage} />
+                  ) : (
+                    <View style={[styles.browseImage, { backgroundColor: chip.bg }]} />
+                  )}
+                  <View style={styles.browseScrim} />
+                  <Text style={styles.browseLabel} numberOfLines={2}>
+                    {cat}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </>
+      ) : null}
+
+      <View style={styles.listTitleRow}>
+        <Text style={styles.sectionTitleInline}>{listTitle}</Text>
+        <Text style={styles.resultCount}>{featured.length}</Text>
+      </View>
     </View>
   );
 
   if (loading && workshops.length === 0) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={COLORS.primaryGreen} />
         <Text style={styles.loadingText}>Cargando talleres…</Text>
       </View>
@@ -445,7 +564,7 @@ export default function WorkshopsListScreen() {
 
   if (error && workshops.length === 0) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
         <Text style={styles.errorTitle}>No se pudieron cargar los talleres</Text>
         <Text style={styles.errorBody}>{error.message}</Text>
         <Pressable style={styles.retryBtn} onPress={() => void refetch()}>
@@ -455,26 +574,16 @@ export default function WorkshopsListScreen() {
     );
   }
 
-  const hasActiveFilters =
-    searchQuery.trim() ||
-    selectedCategory !== 'Todos' ||
-    locationQuery.trim() ||
-    priceMin.trim() ||
-    priceMax.trim() ||
-    difficultyLevel ||
-    language.trim() ||
-    minRating.trim();
-
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <FlatList
-        data={filtered}
+        data={featured}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListHeaderComponent={listHeader}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={
-          filtered.length === 0 ? styles.emptyList : styles.listContent
+          featured.length === 0 ? styles.emptyList : styles.listContent
         }
         refreshControl={
           <RefreshControl
@@ -486,9 +595,9 @@ export default function WorkshopsListScreen() {
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Text style={styles.emptyTitle}>
-              {hasActiveFilters
-                ? 'No hay talleres que coincidan con los filtros.'
-                : 'No hay talleres publicados todavía.'}
+              {isBrowseMode
+                ? 'No hay talleres publicados todavía.'
+                : 'No hay talleres que coincidan con la búsqueda.'}
             </Text>
           </View>
         }
@@ -500,18 +609,18 @@ export default function WorkshopsListScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.surface,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
   },
   loadingText: {
     marginTop: 12,
-    color: '#64748b',
+    color: COLORS.textSecondary,
     fontSize: 15,
   },
   errorTitle: {
@@ -523,7 +632,7 @@ const styles = StyleSheet.create({
   },
   errorBody: {
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -539,38 +648,101 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   headerBlock: {
-    paddingTop: 12,
-    paddingBottom: 4,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  pageTitle: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    letterSpacing: -0.5,
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#f3f1ed',
+    borderRadius: 14,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    paddingVertical: 2,
+  },
+  filterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  filterToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: COLORS.mint,
+  },
+  filterToggleOn: {
+    backgroundColor: COLORS.primaryGreenLight,
+  },
+  filterToggleText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primaryGreenDark,
+  },
+  clearCategory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: COLORS.sand,
+  },
+  clearCategoryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primaryGreenDark,
+  },
+  filtersPanel: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#f7f4ef',
+    gap: 0,
   },
   filterLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textSecondary,
     marginBottom: 8,
-    marginHorizontal: 16,
-    letterSpacing: 0.3,
+    marginTop: 6,
   },
   chipRow: {
     flexDirection: 'row',
-    flexWrap: 'nowrap',
     gap: 8,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  categoryChipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 16,
-    marginBottom: 4,
+    marginBottom: 8,
+    paddingRight: 8,
   },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.divider,
   },
   chipSelected: {
     backgroundColor: COLORS.primaryGreenLight,
@@ -584,80 +756,21 @@ const styles = StyleSheet.create({
   chipTextSelected: {
     color: COLORS.primaryGreenDark,
   },
-  expandBtn: {
-    alignSelf: 'stretch',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    paddingVertical: 8,
-  },
-  expandBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.primaryGreenDark,
-  },
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: COLORS.textPrimary,
-    paddingVertical: 4,
-  },
-  locationInput: {
-    marginHorizontal: 16,
-    marginBottom: 12,
+  fieldInput: {
+    marginBottom: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.divider,
     fontSize: 15,
     color: COLORS.textPrimary,
-  },
-  advancedToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingVertical: 8,
-  },
-  advancedToggleText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.primaryGreenDark,
-  },
-  advancedPanel: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    padding: 14,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  advancedHint: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginBottom: 8,
   },
   rowInputs: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 14,
+    marginBottom: 8,
   },
   smallInput: {
     flex: 1,
@@ -665,30 +778,87 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.divider,
+    backgroundColor: COLORS.surface,
     fontSize: 15,
     color: COLORS.textPrimary,
   },
-  headerDivider: {
-    height: 8,
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  sectionTitleInline: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  listTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  resultCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  browseRow: {
+    paddingHorizontal: 16,
+    gap: 12,
+    paddingBottom: 4,
+  },
+  browseCard: {
+    width: 148,
+    height: 198,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#d9d3c9',
+  },
+  browseCardSelected: {
+    borderWidth: 3,
+    borderColor: COLORS.primaryGreen,
+  },
+  browseImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  browseScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  browseLabel: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 14,
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
+    paddingBottom: FLOATING_TAB_BAR_SPACE,
   },
   emptyList: {
     flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingBottom: 24,
+    paddingBottom: FLOATING_TAB_BAR_SPACE,
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    marginHorizontal: 16,
     marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.divider,
   },
   cardPressed: {
     opacity: 0.92,
@@ -762,7 +932,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#059669',
+    color: COLORS.primaryGreen,
   },
   meta: {
     fontSize: 12,
@@ -775,7 +945,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 15,
-    color: '#64748b',
+    color: COLORS.textSecondary,
     textAlign: 'center',
   },
 });

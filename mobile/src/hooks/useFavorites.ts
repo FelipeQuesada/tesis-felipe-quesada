@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { warmUpFirestoreConnection } from '../lib/firebase';
 import { runWithFirestoreRetry } from '../lib/firestoreRetry';
 import {
   addFavorite,
@@ -17,10 +18,12 @@ export function useFavorites(userId: string | null) {
       return;
     }
     try {
+      await warmUpFirestoreConnection();
       const favs = await runWithFirestoreRetry(() => listUserFavorites(userId));
       setFavoriteIds(new Set(favs.map((f) => f.workshopId)));
     } catch (err) {
-      console.error('Error cargando favoritos:', err);
+      // En Expo Go a veces hay ruido de Target ID; no tumbar la UI.
+      console.warn('Favoritos no disponibles ahora:', err);
     } finally {
       setLoading(false);
     }

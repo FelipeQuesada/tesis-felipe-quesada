@@ -1,6 +1,5 @@
-import { enableNetwork } from 'firebase/firestore';
 import { Platform } from 'react-native';
-import { getFirestoreDb } from './firebase';
+import { warmUpFirestoreConnection } from './firebase';
 
 /** Código/mensaje legible de errores Firebase en UI y logs. */
 export function getFirestoreErrorDetails(err: unknown): {
@@ -19,16 +18,10 @@ export function getFirestoreErrorDetails(err: unknown): {
   return { code: '', message: String(err) };
 }
 
-const NATIVE_WARMUP_MS = 600;
-
+/** Una sola espera inicial; no re-enableNetwork (rompe watch streams en Expo Go). */
 async function ensureFirestoreOnline(): Promise<void> {
   if (Platform.OS === 'web') return;
-  await new Promise((r) => setTimeout(r, NATIVE_WARMUP_MS));
-  try {
-    await enableNetwork(getFirestoreDb());
-  } catch {
-    // Ya en línea o init pendiente
-  }
+  await warmUpFirestoreConnection();
 }
 
 /** Errores de red / timeout de Firestore (no son reglas "permission-denied"). */
@@ -53,7 +46,10 @@ export function isTransientFirestoreError(err: unknown): boolean {
     msg.includes('timed out') ||
     msg.includes('network') ||
     msg.includes('Failed to get document') ||
-    msg.includes('client is offline')
+    msg.includes('client is offline') ||
+    // Conflicto de listeners concurrentes en Expo Go / long polling
+    msg.includes('Target ID already exists') ||
+    msg.includes('INTERNAL ASSERTION FAILED')
   );
 }
 
@@ -87,6 +83,27 @@ export function getDefaultFirestoreRetryOptions(): Required<
 }
 
 /**
+ * En Expo Go el long-polling de Firestore se rompe si hay varias queries a la vez
+ * ("Target ID already exists"). Serializamos las lecturas en nativo.
+ */
+let nativeFirestoreQueue: Promise<unknown> = Promise.resolve();
+
+export function runFirestoreSerialized<T>(operation: () => Promise<T>): Promise<T> {
+  if (Platform.OS === 'web') {
+    return operation();
+  }
+  const next = nativeFirestoreQueue.then(
+    () => operation(),
+    () => operation()
+  );
+  nativeFirestoreQueue = next.then(
+    () => undefined,
+    () => undefined
+  );
+  return next;
+}
+
+/**
  * Reintenta operaciones de Firestore ante timeouts / red inestable.
  * En móvil puede tardar ~1–2 min en total antes de fallar.
  */
@@ -103,7 +120,7 @@ export async function runWithFirestoreRetry<T>(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await ensureFirestoreOnline();
-      return await operation();
+      return await runFirestoreSerialized(operation);
     } catch (err) {
       lastError = err;
       if (!isTransientFirestoreError(err) || attempt === maxAttempts) {

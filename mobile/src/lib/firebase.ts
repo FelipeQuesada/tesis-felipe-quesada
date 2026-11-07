@@ -1,134 +1,92 @@
-import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
+import { Platform } from 'react-native';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, initializeAuth, type Auth } from 'firebase/auth';
 import {
-  collection,
-  enableNetwork,
-  getDocs,
   getFirestore,
   initializeFirestore,
-  limit,
-  query,
+  memoryLocalCache,
   type Firestore,
 } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
-import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { validateFirebaseEnv, getFirebaseClientConfig } from './env';
+import { silenceFirestoreNoise } from './silenceFirestoreNoise';
 
-let firestoreInitAttempted = false;
+// Primero: cortar el spam de LogBox del SDK en Expo Go.
+silenceFirestoreNoise();
 
 /**
- * En iOS/Android el canal por defecto a veces no responde en 10s (bug conocido SDK + Expo).
- * Long polling + no reutilizar getFirestore() sin esos flags tras hot reload.
+ * Init estilo Advance + ajustes anti-crash en Expo Go:
+ * long polling + caché en memoria (sin IndexedDB).
  */
-function createFirestore(app: FirebaseApp): Firestore {
+
+validateFirebaseEnv();
+const firebaseConfig = getFirebaseClientConfig();
+
+const app: FirebaseApp =
+  getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+function createAuth(): Auth {
   if (Platform.OS === 'web') {
-    return getFirestore(app);
-  }
-  if (firestoreInitAttempted) {
-    return getFirestore(app);
-  }
-  firestoreInitAttempted = true;
-  return initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-    experimentalAutoDetectLongPolling: true,
-  });
-}
-
-let app: FirebaseApp | undefined;
-let auth: Auth | undefined;
-let db: Firestore | undefined;
-let storage: FirebaseStorage | undefined;
-
-let clientReady = false;
-let initErrorLogged = false;
-
-/**
- * Inicializa Firebase una sola vez (Expo / React Native).
- * Misma base que la web; solo cambia el prefijo de variables (EXPO_PUBLIC_*).
- */
-const APP_NAME = 'mitaller';
-
-export function ensureFirebaseClient(): void {
-  if (clientReady && app && auth && db && storage) {
-    return;
+    return getAuth(app);
   }
 
   try {
-    validateFirebaseEnv();
-    const config = getFirebaseClientConfig();
-    const current = getApps().find((item) => item.name === APP_NAME);
-
-    if (current && current.options.apiKey === config.apiKey) {
-      app = current;
-    } else if (!current) {
-      app = initializeApp(config, APP_NAME);
-    } else {
-      app = initializeApp(config, `${APP_NAME}-actual`);
-    }
-
-    auth = getAuth(app);
-    db = createFirestore(app);
-    storage = getStorage(app);
-    clientReady = true;
-    initErrorLogged = false;
-  } catch (error) {
-    clientReady = false;
-    if (!initErrorLogged) {
-      initErrorLogged = true;
-      console.error('Error inicializando Firebase (mobile):', error);
-    }
-    throw error;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getReactNativePersistence } = require('@firebase/auth/dist/rn/index.js');
+    return initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch {
+    return getAuth(app);
   }
+}
+
+function createDb(): Firestore {
+  if (Platform.OS === 'web') {
+    return getFirestore(app);
+  }
+  try {
+    return initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      localCache: memoryLocalCache(),
+    });
+  } catch {
+    return getFirestore(app);
+  }
+}
+
+export const auth = createAuth();
+export const db = createDb();
+export const storage: FirebaseStorage = getStorage(app);
+
+export function ensureFirebaseClient(): void {
+  // Eager init al importar.
 }
 
 export function isFirebaseClientReady(): boolean {
-  return clientReady;
+  return Boolean(app && auth && db && storage);
 }
 
-/** Firestore listo para usar (inicializa Firebase si hace falta). Evita carreras con efectos del layout. */
 export function getFirestoreDb(): Firestore {
-  ensureFirebaseClient();
-  if (!db) {
-    throw new Error('Firestore no está inicializado');
-  }
   return db;
 }
 
 export function getAuthClient(): Auth {
-  ensureFirebaseClient();
-  if (!auth) {
-    throw new Error('Auth no está inicializado');
-  }
   return auth;
 }
 
 let warmUpPromise: Promise<void> | null = null;
 
-/**
- * Primera conexión en Expo Go suele fallar; un getDocs liviano + enableNetwork ayuda antes de la UI.
- */
+/** Pausa breve una sola vez; no llamar enableNetwork en loop (regenera Target IDs). */
 export function warmUpFirestoreConnection(): Promise<void> {
   if (Platform.OS === 'web') {
     return Promise.resolve();
   }
   if (!warmUpPromise) {
-    warmUpPromise = (async () => {
-      ensureFirebaseClient();
-      const firestore = getFirestoreDb();
-      try {
-        await enableNetwork(firestore);
-      } catch {
-        /* ignore */
-      }
-      await new Promise((r) => setTimeout(r, 500));
-      try {
-        await getDocs(query(collection(firestore, 'workshops'), limit(1)));
-      } catch {
-        /* el hook de talleres reintenta */
-      }
-    })();
+    warmUpPromise = new Promise((resolve) => setTimeout(resolve, 350));
   }
   return warmUpPromise;
 }
 
-export { app, auth, db, storage };
+export { app };

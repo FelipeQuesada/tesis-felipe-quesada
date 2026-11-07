@@ -14,6 +14,7 @@ import {
 import { Link, useRouter } from 'expo-router';
 import { COLORS } from '../../src/constants/theme';
 import { useAuth } from '../../src/hooks/useAuth';
+import { mapAuthErrorMessage } from '../../src/lib/authErrors';
 import { getHomeHrefForRole } from '../../src/lib/authRedirect';
 
 export default function LoginScreen() {
@@ -40,7 +41,7 @@ export default function LoginScreen() {
     try {
       await signIn(trimmed, password);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al iniciar sesión');
+      setError(mapAuthErrorMessage(e));
     } finally {
       setSubmitting(false);
     }
@@ -50,10 +51,7 @@ export default function LoginScreen() {
     try {
       await signInWithGoogle();
     } catch (e) {
-      Alert.alert(
-        'Google',
-        e instanceof Error ? e.message : 'No se pudo iniciar con Google'
-      );
+      Alert.alert('Google', mapAuthErrorMessage(e));
     }
   };
 

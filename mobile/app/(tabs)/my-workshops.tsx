@@ -9,13 +9,15 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Link, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useStudentEnrollments } from '../../src/hooks/useStudentEnrollments';
 import { useFavorites } from '../../src/hooks/useFavorites';
 import { getWorkshopById } from '../../src/services/workshops.service';
+import { GuestAuthEmpty } from '../../src/components/auth/GuestAuthEmpty';
 import { COLORS } from '../../src/constants/theme';
+import { FLOATING_TAB_BAR_SPACE } from '../../src/components/navigation/FloatingTabBar';
 import { resolvePublicAssetUri } from '../../src/lib/siteAssets';
 import { stockCoverByCategory, stockCoverByIndex } from '../../src/lib/stockImages';
 import type { Enrollment, Workshop } from '../../src/types';
@@ -199,18 +201,11 @@ export default function MyWorkshopsScreen() {
 
   if (!user) {
     return (
-      <View style={styles.emptyWrap}>
-        <Ionicons name="bookmark-outline" size={56} color={COLORS.textSecondary} />
-        <Text style={styles.emptyTitle}>Iniciá sesión para ver tus talleres</Text>
-        <Text style={styles.emptyBody}>
-          Guardá talleres con la estrella en Explorar y ver tus inscripciones acá.
-        </Text>
-        <Link href="/auth/login" asChild>
-          <Pressable style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}>
-            <Text style={styles.primaryBtnText}>Iniciar sesión</Text>
-          </Pressable>
-        </Link>
-      </View>
+      <GuestAuthEmpty
+        icon="bookmark-outline"
+        title="Iniciá sesión para ver tus talleres"
+        body="Guardá talleres con la estrella en Explorar y ver tus inscripciones acá."
+      />
     );
   }
 
@@ -434,46 +429,12 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
-    paddingBottom: 24,
+    paddingBottom: FLOATING_TAB_BAR_SPACE,
   },
   listEmpty: {
     flexGrow: 1,
     justifyContent: 'center',
     padding: 16,
-  },
-  emptyWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: COLORS.background,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyBody: {
-    fontSize: 15,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-    maxWidth: 320,
-  },
-  primaryBtn: {
-    backgroundColor: COLORS.primaryGreen,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 8,
-  },
-  primaryBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
   },
   pressed: { opacity: 0.88 },
   errorText: {

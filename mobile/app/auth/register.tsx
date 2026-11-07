@@ -13,6 +13,7 @@ import {
 import { Link, useRouter } from 'expo-router';
 import { COLORS } from '../../src/constants/theme';
 import { useAuth } from '../../src/hooks/useAuth';
+import { mapAuthErrorMessage } from '../../src/lib/authErrors';
 import { getHomeHrefForRole } from '../../src/lib/authRedirect';
 import { validatePassword } from '../../src/lib/passwordValidation';
 import type { DocumentType, UserRole } from '../../src/types';
@@ -104,7 +105,7 @@ export default function RegisterScreen() {
         documentNumber: cleanDocumentNumber,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al registrarse');
+      setError(mapAuthErrorMessage(e));
     } finally {
       setSubmitting(false);
     }

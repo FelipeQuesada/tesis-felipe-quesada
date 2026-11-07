@@ -19,8 +19,8 @@ export function usePublishedWorkshops() {
       setLoading(true);
       setError(null);
       setRetryAttempt(0);
-      // No bloquear la UI: el warm-up corre en paralelo (en web ya es instantáneo)
-      void warmUpFirestoreConnection();
+      // Esperar warm-up antes de consultar: evita choques de Target ID en Expo Go.
+      await warmUpFirestoreConnection();
       const data = await runWithFirestoreRetry(
         () => listPublishedWorkshops(),
         {

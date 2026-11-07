@@ -4,7 +4,12 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { greenStackScreenOptions } from '../src/constants/navigation';
+import { COLORS } from '../src/constants/theme';
+import { silenceFirestoreNoise } from '../src/lib/silenceFirestoreNoise';
 import { ensureFirebaseClient, warmUpFirestoreConnection } from '../src/lib/firebase';
+
+// Antes que cualquier import de Firestore dispare logs.
+silenceFirestoreNoise();
 
 export default function RootLayout() {
   // Inicializar antes del primer fetch (los useEffect de pantallas hijas corren antes que este useEffect).
@@ -29,7 +34,13 @@ export default function RootLayout() {
     <AuthProvider>
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <Stack screenOptions={greenStackScreenOptions}>
+        <Stack
+          screenOptions={{
+            ...greenStackScreenOptions,
+            // Igual que Advance: sin esto el tab bar transparente deja ver el gris default (#f2f2f2).
+            contentStyle: { backgroundColor: COLORS.background },
+          }}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="teacher" options={{ headerShown: false }} />
           <Stack.Screen name="admin" options={{ headerShown: false }} />

@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import {
   Alert,
   Image,
-  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,6 +21,7 @@ import { resolvePublicAssetUri } from '../../src/lib/siteAssets';
 import { HomeQuickLinks } from '../../src/components/home/HomeQuickLinks';
 import { HomeWelcomeHero } from '../../src/components/home/HomeWelcomeHero';
 import { HomeSearchBar } from '../../src/components/home/HomeSearchBar';
+import { FLOATING_TAB_BAR_SPACE } from '../../src/components/navigation/FloatingTabBar';
 import { stockCoverByCategory, stockCoverByIndex } from '../../src/lib/stockImages';
 import { getCategoryChipStyle } from '../../src/lib/categoryColors';
 
@@ -30,7 +30,12 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user, loading } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites(user?.uid ?? null);
-  const { workshops, loading: wLoading } = usePublishedWorkshops();
+  const {
+    workshops,
+    loading: wLoading,
+    error: wError,
+    refetch: refetchWorkshops,
+  } = usePublishedWorkshops();
   const { posts, loading: bLoading } = usePublishedBlogPosts();
 
   useEffect(() => {
@@ -48,12 +53,12 @@ export default function HomeScreen() {
   const recommended = [...workshops]
     .sort(
       (a, b) =>
-        (b.stats?.enrolledCount ?? 0) - (a.stats?.enrolledCount ?? 0)
+        (b.stats?.enrolledCount ?? 0) - (a.stats?.enrolledCount ?? 0) ||
+        (b.stats?.avgRating ?? 0) - (a.stats?.avgRating ?? 0)
     )
     .slice(0, 8);
 
   const blogList = posts.slice(0, 6);
-  const promoUri = resolvePublicAssetUri('/images/stock-plantas.png');
 
   return (
     <ScrollView
@@ -70,24 +75,18 @@ export default function HomeScreen() {
         </View>
         <View style={styles.topActions}>
           {user ? (
-            <>
-              <View style={styles.iconBtn}>
-                <Ionicons name="notifications-outline" size={20} color={COLORS.brandForest} />
-                <View style={styles.dot} />
-              </View>
-              <Pressable onPress={() => router.push('/account')}>
-                {user.photoURL ? (
-                  <Image source={{ uri: user.photoURL }} style={styles.avatar} />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarText}>{initial}</Text>
-                  </View>
-                )}
-              </Pressable>
-            </>
+            <Pressable onPress={() => router.push('/account')}>
+              {user.photoURL ? (
+                <Image source={{ uri: user.photoURL }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarText}>{initial}</Text>
+                </View>
+              )}
+            </Pressable>
           ) : (
-            <Pressable style={styles.cta} onPress={() => router.push('/auth/login')}>
-              <Text style={styles.ctaText}>Entrar</Text>
+            <Pressable style={styles.loginChip} onPress={() => router.push('/auth/login')}>
+              <Text style={styles.loginChipText}>Entrar</Text>
             </Pressable>
           )}
         </View>
@@ -95,7 +94,19 @@ export default function HomeScreen() {
 
       <HomeWelcomeHero />
       <HomeSearchBar />
-      <HomeQuickLinks />
+      <HomeQuickLinks workshops={workshops} />
+
+      <View style={styles.promo}>
+        <Text style={styles.eyebrow}>UNA COMUNIDAD CREATIVA</Text>
+        <Text style={styles.promoTitle}>Aprendé arte donde y cuando quieras</Text>
+        <Text style={styles.promoSub}>
+          Descubrí talleres presenciales cerca tuyo y conectá con personas que
+          comparten tu pasión.
+        </Text>
+        <Pressable style={styles.cta} onPress={() => router.push('/workshops')}>
+          <Text style={styles.ctaText}>Explorar talleres →</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Talleres recomendados</Text>
@@ -106,8 +117,33 @@ export default function HomeScreen() {
 
       {wLoading ? (
         <Text style={styles.empty}>Cargando talleres…</Text>
+      ) : wError ? (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyTitle}>No pudimos cargar los talleres</Text>
+          <Text style={styles.emptyBody} numberOfLines={3}>
+            {wError.message}
+          </Text>
+          <Pressable style={styles.retryBtn} onPress={() => void refetchWorkshops()}>
+            <Text style={styles.retryBtnText}>Reintentar</Text>
+          </Pressable>
+        </View>
+      ) : recommended.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Ionicons name="color-palette-outline" size={36} color={COLORS.textSecondary} />
+          <Text style={styles.emptyTitle}>Todavía no hay talleres publicados</Text>
+          <Text style={styles.emptyBody}>
+            Cuando haya propuestas nuevas van a aparecer acá.
+          </Text>
+          <Pressable style={styles.retryBtn} onPress={() => router.push('/workshops')}>
+            <Text style={styles.retryBtnText}>Ir a buscar</Text>
+          </Pressable>
+        </View>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.hScroll}
+        >
           {recommended.map((w, i) => {
             const chip = getCategoryChipStyle(w.categoryId);
             const coverPath = w.coverImageUrl?.trim()
@@ -126,7 +162,7 @@ export default function HomeScreen() {
                   {cover ? (
                     <Image source={{ uri: cover }} style={styles.cover} />
                   ) : (
-                    <View style={[styles.cover, { backgroundColor: '#d9d3c9' }]} />
+                    <View style={[styles.cover, { backgroundColor: chip.bg }]} />
                   )}
                   <Pressable
                     style={styles.favBtn}
@@ -157,7 +193,9 @@ export default function HomeScreen() {
                   </Pressable>
                 </View>
                 <View style={styles.cardBody}>
-                  <Text style={[styles.chip, { backgroundColor: chip.bg, color: chip.color }]}>
+                  <Text
+                    style={[styles.chip, { backgroundColor: chip.bg, color: chip.color }]}
+                  >
                     {w.categoryId || 'Taller'}
                   </Text>
                   <Text style={styles.cardTitle} numberOfLines={2}>
@@ -166,47 +204,18 @@ export default function HomeScreen() {
                   <Text style={styles.meta} numberOfLines={1}>
                     {w.location?.addressText?.split(',')[0] || 'Presencial'}
                   </Text>
-                  <Text style={styles.meta}>
-                    {Math.max(0, (w.capacity ?? 0) - (w.stats?.enrolledCount ?? 0))}{' '}
-                    lugares disponibles
+                  <Text style={styles.price}>
+                    {new Intl.NumberFormat('es-AR', {
+                      style: 'currency',
+                      currency: w.currency || 'ARS',
+                      maximumFractionDigits: 0,
+                    }).format(w.price)}
                   </Text>
                 </View>
               </Pressable>
             );
           })}
         </ScrollView>
-      )}
-
-      {promoUri ? (
-        <ImageBackground
-          source={{ uri: promoUri }}
-          style={styles.promo}
-          imageStyle={styles.promoImg}
-        >
-          <View style={styles.promoOverlay}>
-            <Text style={styles.eyebrow}>UNA COMUNIDAD CREATIVA</Text>
-            <Text style={styles.promoTitle}>Aprendé arte donde y cuando quieras</Text>
-            <Text style={styles.promoSub}>
-              Descubrí talleres presenciales cerca tuyo y conectá con personas que
-              comparten tu pasión.
-            </Text>
-            <Pressable style={styles.cta} onPress={() => router.push('/workshops')}>
-              <Text style={styles.ctaText}>Explorar talleres →</Text>
-            </Pressable>
-          </View>
-        </ImageBackground>
-      ) : (
-        <View style={styles.promo}>
-          <Text style={styles.eyebrow}>UNA COMUNIDAD CREATIVA</Text>
-          <Text style={styles.promoTitle}>Aprendé arte donde y cuando quieras</Text>
-          <Text style={styles.promoSub}>
-            Descubrí talleres presenciales cerca tuyo y conectá con personas que
-            comparten tu pasión.
-          </Text>
-          <Pressable style={styles.cta} onPress={() => router.push('/workshops')}>
-            <Text style={styles.ctaText}>Explorar talleres →</Text>
-          </Pressable>
-        </View>
       )}
 
       <View style={styles.sectionHead}>
@@ -218,10 +227,18 @@ export default function HomeScreen() {
 
       {bLoading ? (
         <Text style={styles.empty}>Cargando blog…</Text>
+      ) : blogList.length === 0 ? (
+        <Text style={styles.empty}>Pronto vas a ver notas del blog acá.</Text>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.hScroll}
+        >
           {blogList.map((post, i) => {
             const uri = blogCoverUri(post.coverImageUrl, i);
+            const fallback = resolvePublicAssetUri(stockCoverByIndex(i));
+            const cover = uri || fallback;
             return (
               <Pressable
                 key={post.id}
@@ -229,7 +246,7 @@ export default function HomeScreen() {
                 onPress={() => router.push(`/blog/${post.id}` as Href)}
               >
                 <View style={styles.blogCover}>
-                  {uri ? <Image source={{ uri }} style={styles.cover} /> : null}
+                  {cover ? <Image source={{ uri: cover }} style={styles.cover} /> : null}
                 </View>
                 <View style={styles.cardBody}>
                   <Text style={styles.cardTitle} numberOfLines={3}>
@@ -248,42 +265,32 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   blank: { flex: 1, backgroundColor: COLORS.background },
-  content: { paddingHorizontal: 16, paddingBottom: 28 },
+  content: { paddingHorizontal: 16, paddingBottom: FLOATING_TAB_BAR_SPACE },
   topbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   brandMark: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: COLORS.primaryGreen,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandMarkText: { color: '#fff', fontWeight: '800' },
-  brand: { fontSize: 20, fontWeight: '800', color: COLORS.brandForest },
+  brandMarkText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  brand: { fontSize: 22, fontWeight: '800', color: COLORS.brandForest },
   topActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+  loginChip: {
+    backgroundColor: COLORS.brandForest,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
   },
-  dot: {
-    position: 'absolute',
-    top: 9,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#e63946',
-  },
+  loginChipText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   avatar: { width: 40, height: 40, borderRadius: 20 },
   avatarFallback: {
     width: 40,
@@ -294,11 +301,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { color: '#fff', fontWeight: '700' },
+  promo: {
+    borderRadius: 24,
+    marginTop: 8,
+    marginBottom: 22,
+    padding: 18,
+    backgroundColor: COLORS.mint,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 106, 79, 0.12)',
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    color: COLORS.primaryGreen,
+    marginBottom: 8,
+  },
+  promoTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.brandForest,
+    marginBottom: 8,
+    lineHeight: 28,
+  },
+  promoSub: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+    marginBottom: 14,
+    lineHeight: 20,
+  },
   cta: {
     alignSelf: 'flex-start',
     backgroundColor: COLORS.brandForest,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
     borderRadius: 999,
   },
   ctaText: { color: '#fff', fontWeight: '700', fontSize: 13 },
@@ -306,31 +343,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+    marginTop: 4,
   },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: COLORS.brandForest },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.brandForest },
   seeAll: { fontSize: 13, fontWeight: '700', color: COLORS.primaryGreen },
-  hScroll: { gap: 12, paddingBottom: 8 },
+  hScroll: { gap: 12, paddingBottom: 16, paddingRight: 4 },
   workshopCard: {
-    width: 200,
+    width: 210,
     backgroundColor: COLORS.surface,
-    borderRadius: 18,
+    borderRadius: 20,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
-  coverWrap: { height: 120, backgroundColor: '#d9d3c9', position: 'relative' },
+  coverWrap: { height: 132, backgroundColor: '#d9d3c9', position: 'relative' },
   cover: { width: '100%', height: '100%' },
   favBtn: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.94)',
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardBody: { padding: 10 },
+  cardBody: { padding: 12 },
   chip: {
     alignSelf: 'flex-start',
     fontSize: 11,
@@ -342,57 +382,58 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   cardTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
     color: COLORS.brandForest,
     marginBottom: 4,
+    lineHeight: 20,
   },
-  meta: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 2 },
-  promo: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 34,
-    borderBottomRightRadius: 20,
-    borderBottomLeftRadius: 30,
-    marginVertical: 16,
-    overflow: 'hidden',
-    backgroundColor: COLORS.mint,
-  },
-  promoImg: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 34,
-    borderBottomRightRadius: 20,
-    borderBottomLeftRadius: 30,
-  },
-  promoOverlay: {
-    padding: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-  },
-  eyebrow: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    color: COLORS.primaryGreen,
-    marginBottom: 6,
-  },
-  promoTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.brandForest,
-    marginBottom: 6,
-  },
-  promoSub: {
-    fontSize: 13,
-    color: COLORS.brandForest,
+  meta: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 4 },
+  price: {
+    fontSize: 14,
     fontWeight: '700',
-    marginBottom: 12,
-    lineHeight: 18,
+    color: COLORS.primaryGreen,
+    marginTop: 2,
   },
   blogCard: {
-    width: 190,
+    width: 200,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+  },
+  blogCover: { height: 112, backgroundColor: '#cfc7bb' },
+  empty: { color: COLORS.textSecondary, marginBottom: 16 },
+  emptyBox: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    marginBottom: 16,
     backgroundColor: COLORS.surface,
     borderRadius: 18,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    gap: 8,
   },
-  blogCover: { height: 100, backgroundColor: '#cfc7bb' },
-  empty: { color: COLORS.textSecondary, marginBottom: 12 },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  retryBtn: {
+    marginTop: 6,
+    backgroundColor: COLORS.brandForest,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  retryBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });
